@@ -5,7 +5,7 @@ import { supabase } from '@/app/utils/supabase';
 import { useRouter } from 'next/navigation';
 
 export default function CRMHome() {
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
