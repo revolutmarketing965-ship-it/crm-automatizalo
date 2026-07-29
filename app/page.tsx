@@ -317,10 +317,13 @@ export default function CRMHome() {
 
     setSavingSocio(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+
       const { error } = await supabase.from('socios').insert([
         { 
           lead_id: selectedSocioLeadId,
-          payment_status: paymentStatus
+          payment_status: paymentStatus,
+          user_id: user?.id
         }
       ]);
       if (error) throw error;
