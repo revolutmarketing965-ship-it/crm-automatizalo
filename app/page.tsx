@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Inicialización de Supabase (ajusta según tus variables de entorno si es necesario)
+// Inicialización de Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -52,7 +52,6 @@ export default function CRMPage() {
   const [savingUser, setSavingUser] = useState(false);
 
   useEffect(() => {
-    // Simulación de carga de sesión inicial
     const timer = setTimeout(() => {
       setLoadingSession(false);
       fetchLeads();
@@ -130,6 +129,11 @@ export default function CRMPage() {
     await supabase.from('leads').update({ notes }).eq('id', id);
   };
 
+  const handleUpdatePaymentStatus = async (id: string, payment_status: string) => {
+    await supabase.from('socios').update({ payment_status }).eq('id', id);
+    fetchSocios();
+  };
+
   const handleDeleteLead = async (id: string) => {
     if (confirm('¿Estás seguro de eliminar este lead?')) {
       await supabase.from('leads').delete().eq('id', id);
@@ -201,7 +205,6 @@ export default function CRMPage() {
     e.preventDefault();
     setSavingUser(true);
     try {
-      // Lógica de creación de usuario en Auth y perfiles
       alert('Funcionalidad de creación de usuario conectada.');
       setIsUserModalOpen(false);
       setNuevoNombre('');
@@ -214,7 +217,6 @@ export default function CRMPage() {
     }
   };
 
-  // --- RENDERIZADO CONDICIONAL DE CARGA ---
   if (loadingSession) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-900 text-white">
@@ -223,7 +225,6 @@ export default function CRMPage() {
     );
   }
 
-  // --- RENDERIZADO PRINCIPAL ---
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
       {/* Sidebar */}
@@ -548,9 +549,15 @@ export default function CRMPage() {
                           <td className="px-4 py-3 text-green-400">{socio.leads?.phone || 'Sin teléfono'}</td>
                           <td className="px-4 py-3">{socio.created_at ? new Date(socio.created_at).toLocaleDateString() : 'N/A'}</td>
                           <td className="px-4 py-3">
-                            <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs">
-                              {socio.payment_status || 'Pagado'}
-                            </span>
+                            <select
+                              value={socio.payment_status || 'Pagado'}
+                              onChange={(e) => handleUpdatePaymentStatus(socio.id, e.target.value)}
+                              className="bg-gray-900 border border-gray-700 text-white text-xs rounded px-2 py-1"
+                            >
+                              <option value="Pagado">Pagado</option>
+                              <option value="Seña / Parcial">Seña / Parcial</option>
+                              <option value="Pendiente">Pendiente</option>
+                            </select>
                           </td>
                           <td className="px-4 py-3 text-center">
                             {userRole === 'admin' && (
