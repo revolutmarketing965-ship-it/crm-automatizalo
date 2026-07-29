@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Inicialización de Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -13,25 +12,21 @@ export default function CRMPage() {
   const [userRole, setUserRole] = useState<'admin' | 'vendedor'>('admin');
   const [activeTab, setActiveTab] = useState<'leads' | 'citas' | 'socios' | 'equipo'>('leads');
   
-  // Estados de datos
   const [leads, setLeads] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [socios, setSocios] = useState<any[]>([]);
   const [teamProfiles, setTeamProfiles] = useState<any[]>([]);
 
-  // Estados de carga de tablas
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [loadingCitas, setLoadingCitas] = useState(false);
   const [loadingSocios, setLoadingSocios] = useState(false);
   const [loadingTeam, setLoadingTeam] = useState(false);
 
-  // Estados de Modales
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCitaModalOpen, setIsCitaModalOpen] = useState(false);
   const [isSocioModalOpen, setIsSocioModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
-  // Campos de formularios
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [origen, setOrigen] = useState('Facebook Ads');
@@ -227,7 +222,6 @@ export default function CRMPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
-      {/* Sidebar */}
       <aside className="w-64 bg-gray-800 p-6 flex flex-col justify-between border-r border-gray-700">
         <div>
           <div className="mb-6 flex flex-col items-center justify-center">
@@ -240,9 +234,7 @@ export default function CRMPage() {
             
             <div className="mt-3 text-center">
               <span className="text-[11px] text-gray-300 block truncate max-w-[180px]">Panel Administrativo</span>
-              <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold ${
-                userRole === 'admin' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-blue-500/20 text-blue-400'
-              }`}>
+              <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
                 {userRole === 'admin' ? '👑 Administrador' : '💼 Vendedor'}
               </span>
             </div>
@@ -298,7 +290,6 @@ export default function CRMPage() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8 pb-4 border-b border-gray-700">
           <h2 className="text-2xl font-semibold capitalize">
@@ -601,9 +592,7 @@ export default function CRMPage() {
                           <td className="px-4 py-3 font-medium text-white">{member.full_name || 'Sin nombre'}</td>
                           <td className="px-4 py-3 text-gray-300">{member.email || 'Sin correo'}</td>
                           <td className="px-4 py-3">
-                            <span className={`inline-block px-2.5 py-1 rounded text-xs font-semibold ${
-                              member.role === 'admin' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
-                            }`}>
+                            <span className="inline-block px-2.5 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400">
                               {member.role === 'admin' ? '👑 Administrador' : '💼 Vendedor'}
                             </span>
                           </td>
@@ -789,7 +778,7 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* MODAL NUEVO USUARIO (ADMIN) */}
+      {/* MODAL NUEVO USUARIO */}
       {isUserModalOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md">
