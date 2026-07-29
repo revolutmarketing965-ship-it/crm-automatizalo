@@ -807,7 +807,7 @@ export default function CRMPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Contraseña Temporal</label>
+                <label className="block text-sm text-gray-400 PID mb-1">Contraseña Temporal</label>
                 <input
                   type="password"
                   value={nuevoPassword}
