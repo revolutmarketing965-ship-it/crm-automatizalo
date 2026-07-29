@@ -284,14 +284,11 @@ export default function CRMHome() {
 
     setSavingCita(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
       const { error } = await supabase.from('appointments').insert([
         { 
           lead_id: selectedLeadId,
           scheduled_at: fechaCita, 
-          status: 'Agendada',
-          user_id: user?.id 
+          status: 'Agendada'
         }
       ]);
       if (error) throw error;
@@ -317,13 +314,10 @@ export default function CRMHome() {
 
     setSavingSocio(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
       const { error } = await supabase.from('socios').insert([
         { 
           lead_id: selectedSocioLeadId,
-          payment_status: paymentStatus,
-          user_id: user?.id
+          payment_status: paymentStatus
         }
       ]);
       if (error) throw error;
