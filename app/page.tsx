@@ -34,7 +34,6 @@ export default function CRMPage() {
   const [isSocioModalOpen, setIsSocioModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
-  // Campos para nuevo lead con correo opcional
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [correo, setCorreo] = useState('');
@@ -56,7 +55,6 @@ export default function CRMPage() {
   const [nuevoRol, setNuevoRol] = useState('vendedor');
   const [savingUser, setSavingUser] = useState(false);
 
-  // Plantilla de mensaje automático con etiqueta {nombre}
   const [whatsappTemplate, setWhatsappTemplate] = useState(
     'Hola {nombre}, te recordamos que tienes una cita agendada en nuestro gimnasio. ¡Te esperamos!'
   );
@@ -101,14 +99,14 @@ export default function CRMPage() {
 
   const fetchCitas = async () => {
     setLoadingCitas(true);
-    const { data } = await supabase.from('appointments').select('*, leads(name, phone)');
+    const { data } = await supabase.from('appointments').select('*, leads(full_name, name, phone)');
     if (data) setEquipoCitas(data);
     setLoadingCitas(false);
   };
 
   const fetchSocios = async () => {
     setLoadingSocios(true);
-    const { data } = await supabase.from('socios').select('*, leads(name, phone)');
+    const { data } = await supabase.from('socios').select('*, leads(full_name, name, phone)');
     if (data) setSocios(data);
     setLoadingSocios(false);
   };
@@ -133,7 +131,7 @@ export default function CRMPage() {
     e.preventDefault();
     setSavingLead(true);
     const { error } = await supabase.from('leads').insert([{ 
-      name: nombre, 
+      full_name: nombre, 
       phone: telefono, 
       email: correo || null, 
       origin 
@@ -224,13 +222,11 @@ export default function CRMPage() {
     }
   };
 
-  // Generador de enlace de WhatsApp con plantilla personalizada reemplazando {nombre}
   const getWhatsAppLink = (phone: string, leadName: string) => {
     const customizedMessage = whatsappTemplate.replace(/{nombre}/g, leadName || 'Cliente');
     return `https://wa.me/${phone}?text=${encodeURIComponent(customizedMessage)}`;
   };
 
-  // Métricas y porcentajes de aciertos / desaciertos
   const totalLeadsCount = dirige.length;
   const totalCitasCount = equipoCitas.length;
   const totalSociosCount = socios.length;
@@ -467,9 +463,9 @@ export default function CRMPage() {
                 {dirige.map((l) => (
                   <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
                     <div>
-                      <h4 className="font-bold text-white text-sm">{l.name}</h4>
+                      <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
                       <p className="text-xs text-gray-400">{l.phone} {l.email ? `• ${l.email}` : ''} • <span className="text-blue-400">{l.origin}</span></p>
-                      <p className="text-[10px] text-gray-500 mt-1">Registrado: {new Date(l.created_at).toLocaleString()}</p>
+                      <p className="text-[10px] text-gray-500 mt-1">Registrado: {l.created_at ? new Date(l.created_at).toLocaleString() : 'N/D'}</p>
                     </div>
                     <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
                       <button 
@@ -478,7 +474,7 @@ export default function CRMPage() {
                       >
                         📅 Agendar Cita
                       </button>
-                      <a href={getWhatsAppLink(l.phone, l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
+                      <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
                         WhatsApp
                       </a>
                     </div>
@@ -489,10 +485,10 @@ export default function CRMPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {dirige.map((l) => (
                   <div key={l.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-sm">
-                    <h4 className="font-bold text-white text-sm">{l.name}</h4>
+                    <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
                     <p className="text-xs text-gray-400">📞 {l.phone}</p>
                     {l.email && <p className="text-xs text-gray-400">✉️ {l.email}</p>}
-                    <p className="text-[10px] text-gray-500">Registrado: {new Date(l.created_at).toLocaleString()}</p>
+                    <p className="text-[10px] text-gray-500">Registrado: {l.created_at ? new Date(l.created_at).toLocaleString() : 'N/D'}</p>
                     <div className="flex space-x-2 pt-1">
                       <button 
                         onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
@@ -500,7 +496,7 @@ export default function CRMPage() {
                       >
                         Agendar Cita
                       </button>
-                      <a href={getWhatsAppLink(l.phone, l.name)} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 bg-green-600 text-white rounded-lg text-xs font-bold">
+                      <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 bg-green-600 text-white rounded-lg text-xs font-bold">
                         WhatsApp
                       </a>
                     </div>
@@ -516,7 +512,7 @@ export default function CRMPage() {
                   {dirige.map((l) => (
                     <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center">
                       <div>
-                        <h4 className="font-bold text-white text-xs">{l.name}</h4>
+                        <h4 className="font-bold text-white text-xs">{l.full_name || l.name}</h4>
                         <p className="text-[10px] text-gray-400">{l.phone}</p>
                       </div>
                       <button onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }} className="px-2.5 py-1 bg-blue-600 text-white text-[10px] rounded font-bold">
@@ -547,7 +543,7 @@ export default function CRMPage() {
                 {equipoCitas.map((c) => (
                   <div key={c.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center">
                     <div>
-                      <h4 className="font-bold text-white text-sm">{c.leads?.name || 'Cliente'}</h4>
+                      <h4 className="font-bold text-white text-sm">{c.leads?.full_name || c.leads?.name || 'Cliente'}</h4>
                       <p className="text-xs text-amber-400">📅 Fecha: {c.appointment_date} {c.appointment_time ? `• ⏰ ${c.appointment_time}` : ''}</p>
                     </div>
                     <span className="text-[10px] bg-amber-900/40 text-amber-300 border border-amber-700 px-2 py-1 rounded-lg">Agendado</span>
@@ -575,7 +571,7 @@ export default function CRMPage() {
                 {socios.map((s) => (
                   <div key={s.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center">
                     <div>
-                      <h4 className="font-bold text-white text-sm">{s.leads?.name || 'Socio'}</h4>
+                      <h4 className="font-bold text-white text-sm">{s.leads?.full_name || s.leads?.name || 'Socio'}</h4>
                       <p className="text-xs text-gray-400">Estado: <span className="text-green-400 font-bold">{s.payment_status}</span></p>
                     </div>
                   </div>
@@ -585,7 +581,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* SECCIÓN DE MÉTRICAS CON CÍRCULOS DE PORCENTAJES */}
         {currentTab === 'metricas' && (
           <div className="space-y-5">
             <h2 className="text-base font-bold text-white mb-2">Métricas de Conversión y Rendimiento</h2>
@@ -626,7 +621,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* SECCIÓN DE CONFIGURACIÓN DE MENSAJES AUTOMÁTICOS */}
         {currentTab === 'mensajes' && (
           <div className="space-y-4">
             <h2 className="text-base font-bold text-white mb-2">Plantilla de WhatsApp Automática</h2>
@@ -747,7 +741,7 @@ export default function CRMPage() {
                 <label className="block text-xs font-bold text-gray-300 mb-1">Seleccionar Lead</label>
                 <select required value={selectedLeadId} onChange={e => setSelectedLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
                   <option value="">Selecciona un Lead</option>
-                  {dirige.map(l => <option key={l.id} value={l.id}>{l.name} ({l.phone})</option>)}
+                  {dirige.map(l => <option key={l.id} value={l.id}>{l.full_name || l.name} ({l.phone})</option>)}
                 </select>
               </div>
               <div>
@@ -775,7 +769,7 @@ export default function CRMPage() {
             <form onSubmit={handleCreateSocio} className="space-y-3">
               <select required value={selectedSocioLeadId} onChange={e => setSelectedSocioLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
                 <option value="">Selecciona un Lead</option>
-                {dirige.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {dirige.map(l => <option key={l.id} value={l.id}>{l.full_name || l.name}</option>)}
               </select>
               <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
                 <option value="Pagado">Pagado</option>
