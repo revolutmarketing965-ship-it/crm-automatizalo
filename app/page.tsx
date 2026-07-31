@@ -14,12 +14,14 @@ export default function CRMPage() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const [currentTab, setCurrentTab] = useState<'dirige' | 'citas' | 'socios' | 'equipo' | 'metricas' | 'mensajes'>('dirige');
+  const [currentTab, setCurrentTab] = useState<'dirige' | 'citas' | 'socios' | 'membresias' | 'equipo' | 'metricas' | 'mensajes'>('dirige');
   const [activeView, setActiveView] = useState<'lista' | 'tarjetas' | 'kanban'>('lista');
+  const [activeSociosView, setActiveSociosView] = useState<'lista' | 'tarjetas' | 'kanban'>('lista');
 
   const [dirige, setDirige] = useState<any[]>([]);
   const [equipoCitas, setEquipoCitas] = useState<any[]>([]);
   const [socios, setSocios] = useState<any[]>([]);
+  const [membresias, setMembresias] = useState<any[]>([]);
   const [perfilesEquipo, setPerfilesEquipo] = useState<any[]>([]);
 
   const statuses = [
@@ -32,6 +34,7 @@ export default function CRMPage() {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [loadingCitas, setLoadingCitas] = useState(false);
   const [loadingSocios, setLoadingSocios] = useState(false);
+  const [loadingMembresias, setLoadingMembresias] = useState(false);
   const [loadingTeam, setLoadingTeam] = useState(false);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -39,11 +42,13 @@ export default function CRMPage() {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCitaModalOpen, setIsCitaModalOpen] = useState(false);
   const [isSocioModalOpen, setIsSocioModalOpen] = useState(false);
+  const [isMembresiaModalOpen, setIsMembresiaModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
   const [editingLead, setEditingLead] = useState<any>(null);
   const [editingCita, setEditingCita] = useState<any>(null);
   const [editingSocio, setEditingSocio] = useState<any>(null);
+  const [editingMembresia, setEditingMembresia] = useState<any>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
 
   const [currentNoteTarget, setCurrentNoteTarget] = useState<{ type: 'lead' | 'cita' | 'socio', id: string, name: string, notes: string } | null>(null);
@@ -64,9 +69,15 @@ export default function CRMPage() {
   const [savingCita, setSavingCita] = useState(false);
 
   const [selectedSocioLeadId, setSelectedSocioLeadId] = useState('');
+  const [selectedMembresiaId, setSelectedMembresiaId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('Pagado');
   const [notasSocio, setNotasSocio] = useState('');
   const [savingSocio, setSavingSocio] = useState(false);
+
+  const [nombreMembresia, setNombreMembresia] = useState('');
+  const [seccionesMembresia, setSeccionesMembresia] = useState('');
+  const [precioMembresia, setPrecioMembresia] = useState('');
+  const [savingMembresia, setSavingMembresia] = useState(false);
 
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [nuevoEmail, setNuevoEmail] = useState('');
@@ -125,9 +136,16 @@ export default function CRMPage() {
 
   const fetchSocios = async () => {
     setLoadingSocios(true);
-    const { data } = await supabase.from('socios').select('*, leads(id, full_name, name, phone)');
+    const { data } = await supabase.from('socios').select('*, leads(id, full_name, name, phone), membresias(id, nombre, secciones, precio)');
     if (data) setSocios(data);
     setLoadingSocios(false);
+  };
+
+  const fetchMembresias = async () => {
+    setLoadingMembresias(true);
+    const { data } = await supabase.from('membresias').select('*');
+    if (data) setMembresias(data);
+    setLoadingMembresias(false);
   };
 
   const fetchTeam = async () => {
@@ -142,6 +160,7 @@ export default function CRMPage() {
       fetchDirige();
       fetchCitas();
       fetchSocios();
+      fetchMembresias();
       fetchTeam();
     }
   }, [session]);
@@ -275,13 +294,14 @@ export default function CRMPage() {
 
   const handleConvertLeadToSocio = async (leadId: string) => {
     if (!leadId) return;
+    const defaultMembresiaId = membresias.length > 0 ? membresias[0].id : null;
     const { error } = await supabase.from('socios').insert([{
       lead_id: leadId,
+      membresia_id: defaultMembresiaId,
       payment_status: 'Pagado',
-      notes: 'Convertido directamente desde Citas/Leads'
+      notes: 'Convertido directamente desde sistema'
     }]);
     if (!error) {
-      // Opcional: actualizar el estado del lead a CITA AGENDA o cerrar ciclo
       await supabase.from('leads').update({ status: 'CITA AGENDA' }).eq('id', leadId);
       fetchSocios();
       fetchDirige();
@@ -295,16 +315,20 @@ export default function CRMPage() {
     e.preventDefault();
     setSavingSocio(true);
 
-    if (editingSocio) {
-      const { error } = await supabase.from('socios').update({
-        payment_status: paymentStatus,
-        notes: notasSocio || null
-      }).eq('id', editingSocio.id);
+    const payload = {
+      lead_id: selectedSocioLeadId || editingSocio?.lead_id,
+      membresia_id: selectedMembresiaId || null,
+      payment_status: paymentStatus,
+      notes: notasSocio || null
+    };
 
+    if (editingSocio) {
+      const { error } = await supabase.from('socios').update(payload).eq('id', editingSocio.id);
       setSavingSocio(false);
       if (!error) {
         setEditingSocio(null);
         setSelectedSocioLeadId('');
+        setSelectedMembresiaId('');
         setPaymentStatus('Pagado');
         setNotasSocio('');
         setIsSocioModalOpen(false);
@@ -318,14 +342,11 @@ export default function CRMPage() {
         setSavingSocio(false);
         return;
       }
-      const { error } = await supabase.from('socios').insert([{ 
-        lead_id: selectedSocioLeadId, 
-        payment_status: paymentStatus,
-        notes: notasSocio || null
-      }]);
+      const { error } = await supabase.from('socios').insert([payload]);
       setSavingSocio(false);
       if (!error) {
         setSelectedSocioLeadId('');
+        setSelectedMembresiaId('');
         setPaymentStatus('Pagado');
         setNotasSocio('');
         setIsSocioModalOpen(false);
@@ -341,6 +362,51 @@ export default function CRMPage() {
     const { error } = await supabase.from('socios').delete().eq('id', socioId);
     if (!error) fetchSocios();
     else alert('No se pudo eliminar el socio.');
+  };
+
+  const handleCreateOrUpdateMembresia = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingMembresia(true);
+
+    const payload = {
+      nombre: nombreMembresia,
+      secciones: seccionesMembresia || null,
+      precio: precioMembresia ? parseFloat(precioMembresia) : 0
+    };
+
+    if (editingMembresia) {
+      const { error } = await supabase.from('membresias').update(payload).eq('id', editingMembresia.id);
+      setSavingMembresia(false);
+      if (!error) {
+        setEditingMembresia(null);
+        setNombreMembresia('');
+        setSeccionesMembresia('');
+        setPrecioMembresia('');
+        setIsMembresiaModalOpen(false);
+        fetchMembresias();
+      } else {
+        alert('Error al actualizar membresía: ' + error.message);
+      }
+    } else {
+      const { error } = await supabase.from('membresias').insert([payload]);
+      setSavingMembresia(false);
+      if (!error) {
+        setNombreMembresia('');
+        setSeccionesMembresia('');
+        setPrecioMembresia('');
+        setIsMembresiaModalOpen(false);
+        fetchMembresias();
+      } else {
+        alert('Error al crear membresía: ' + error.message);
+      }
+    }
+  };
+
+  const handleDeleteMembresia = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar esta membresía?')) return;
+    const { error } = await supabase.from('membresias').delete().eq('id', id);
+    if (!error) fetchMembresias();
+    else alert('No se pudo eliminar la membresía.');
   };
 
   const handleSaveNote = async (e: React.FormEvent) => {
@@ -430,7 +496,6 @@ export default function CRMPage() {
   const conversionRate = totalLeadsCount > 0 ? Math.round((totalSociosCount / totalLeadsCount) * 100) : 0;
   const failureRate = 100 - conversionRate;
 
-  // Estadísticas para gráfica de barras de estados
   const statusCounts = statuses.map((st) => {
     const count = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === st).length;
     const percentage = totalLeadsCount > 0 ? Math.round((count / totalLeadsCount) * 100) : 0;
@@ -567,6 +632,9 @@ export default function CRMPage() {
               <button onClick={() => { setCurrentTab('socios'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
                 <span className="mr-3">👥</span> Socios (Compradores)
               </button>
+              <button onClick={() => { setCurrentTab('membresias'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
+                <span className="mr-3">🏷️</span> Membresías y Secciones
+              </button>
               <button onClick={() => { setCurrentTab('metricas'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
                 <span className="mr-3">📊</span> Métricas y Aciertos
               </button>
@@ -592,19 +660,19 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl z-10 space-y-5 text-gray-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🚀</span> <span>Guía y Novedades</span>
+                <span>🚀</span> <span>Membresías y Socios</span>
               </h3>
               <button onClick={() => setIsOnboardingOpen(false)} className="text-gray-400 hover:text-white font-bold text-lg">✕</button>
             </div>
             
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">1. Volver Socio desde Citas</h4>
-                <p>Ahora puedes convertir directamente una cita o lead en socio activo con el botón verde correspondiente.</p>
+                <h4 className="font-bold text-blue-400 text-sm">1. Creación de Membresías</h4>
+                <p>Configura planes, precios y secciones personalizadas en la nueva sección de Membresías del menú lateral.</p>
               </div>
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">2. Gráfica de Estados</h4>
-                <p>Visualiza el rendimiento de tus prospectos en la pestaña Métricas a través de la nueva gráfica de barras.</p>
+                <h4 className="font-bold text-blue-400 text-sm">2. Vistas Múltiples en Socios</h4>
+                <p>Explora tu cartera de socios con vistas en Lista, Tarjetas o Columnas (Kanban) con acceso a tarjetas editables.</p>
               </div>
             </div>
 
@@ -635,6 +703,29 @@ export default function CRMPage() {
           <button
             onClick={() => setActiveView('kanban')}
             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeView === 'kanban' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}
+          >
+            📊 Columnas
+          </button>
+        </div>
+      )}
+
+      {currentTab === 'socios' && (
+        <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex justify-center space-x-2 sticky top-[53px] z-10 shadow-sm">
+          <button
+            onClick={() => setActiveSociosView('lista')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeSociosView === 'lista' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}
+          >
+            📋 Lista
+          </button>
+          <button
+            onClick={() => setActiveSociosView('tarjetas')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeSociosView === 'tarjetas' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}
+          >
+            📇 Tarjetas
+          </button>
+          <button
+            onClick={() => setActiveSociosView('kanban')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeSociosView === 'kanban' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}
           >
             📊 Columnas
           </button>
@@ -821,7 +912,6 @@ export default function CRMPage() {
                 })}
               </div>
             ) : (
-              /* VISTA KANBAN */
               <div className="flex space-x-4 overflow-x-auto pb-4">
                 {statuses.map((status) => {
                   const statusLeads = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === status);
@@ -941,11 +1031,12 @@ export default function CRMPage() {
         {currentTab === 'socios' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
-              <h2 className="text-base font-bold text-white">Socios Activos</h2>
+              <h2 className="text-base font-bold text-white">Socios Activos ({socios.length})</h2>
               <button 
                 onClick={() => { 
                   setEditingSocio(null); 
                   setSelectedSocioLeadId(''); 
+                  setSelectedMembresiaId(membresias[0]?.id || '');
                   setPaymentStatus('Pagado'); 
                   setNotasSocio(''); 
                   setIsSocioModalOpen(true); 
@@ -955,37 +1046,41 @@ export default function CRMPage() {
                 + Nuevo Socio
               </button>
             </div>
+
             {loadingSocios ? (
               <p className="text-center text-gray-500 py-10 text-xs">Cargando socios...</p>
             ) : socios.length === 0 ? (
               <p className="text-center text-gray-500 py-10 text-xs">No hay socios registrados.</p>
-            ) : (
+            ) : activeSociosView === 'lista' ? (
               <div className="space-y-2">
                 {socios.map((s) => {
-                  const statusColor = 
-                    s.payment_status === 'Pagado' ? 'text-green-400' :
-                    s.payment_status === 'Pendiente' ? 'text-red-400' : 'text-orange-400';
-                  
+                  const socioName = s.leads?.full_name || s.leads?.name || 'Socio';
+                  const membName = s.membresias?.nombre || 'Sin Membresía';
+                  const membSecc = s.membresias?.secciones || '';
+                  const statusColor = s.payment_status === 'Pagado' ? 'text-green-400' : 'text-red-400';
+
                   return (
-                    <div key={s.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center shadow-sm">
-                      <div className="flex-1">
+                    <div key={s.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
+                      <div className="flex-1 space-y-1">
                         <div className="flex items-center space-x-2">
-                          <h4 className="font-bold text-white text-sm">{s.leads?.full_name || s.leads?.name || 'Socio'}</h4>
+                          <span className="text-[10px] font-black bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded uppercase">🏷️ {membName}</span>
                           <button 
-                            onClick={() => setCurrentNoteTarget({ type: 'socio', id: s.id, name: s.leads?.full_name || 'Socio', notes: s.notes || '' })}
+                            onClick={() => setCurrentNoteTarget({ type: 'socio', id: s.id, name: socioName, notes: s.notes || '' })}
                             className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
                           >
                             📝 {s.notes ? 'Ver Nota' : '+ Nota'}
                           </button>
                         </div>
-                        <p className="text-xs text-gray-400 mt-0.5">Estado: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
-                        {s.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {s.notes}</p>}
+                        <h4 className="font-bold text-white text-sm">{socioName}</h4>
+                        <p className="text-xs text-gray-400">Secciones: <span className="text-blue-300">{membSecc || 'N/A'}</span> • Estado: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
+                        {s.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {s.notes}</p>}
                       </div>
                       <div className="flex items-center space-x-2">
                         <button 
                           onClick={() => {
                             setEditingSocio(s);
                             setSelectedSocioLeadId(s.lead_id || '');
+                            setSelectedMembresiaId(s.membresia_id || '');
                             setPaymentStatus(s.payment_status || 'Pagado');
                             setNotasSocio(s.notes || '');
                             setIsSocioModalOpen(true);
@@ -1004,6 +1099,131 @@ export default function CRMPage() {
                     </div>
                   );
                 })}
+              </div>
+            ) : activeSociosView === 'tarjetas' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {socios.map((s) => {
+                  const socioName = s.leads?.full_name || s.leads?.name || 'Socio';
+                  const membName = s.membresias?.nombre || 'Sin Membresía';
+                  const membSecc = s.membresias?.secciones || '';
+                  const statusColor = s.payment_status === 'Pagado' ? 'text-green-400' : 'text-red-400';
+
+                  return (
+                    <div key={s.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2.5 shadow-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded uppercase">🏷️ {membName}</span>
+                        <button 
+                          onClick={() => setCurrentNoteTarget({ type: 'socio', id: s.id, name: socioName, notes: s.notes || '' })}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
+                        >
+                          📝 {s.notes ? 'Ver Nota' : '+ Nota'}
+                        </button>
+                      </div>
+                      <h4 className="font-bold text-white text-sm">{socioName}</h4>
+                      <p className="text-xs text-gray-400">Secciones: {membSecc || 'N/A'}</p>
+                      <p className="text-xs text-gray-400">Pago: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
+                      {s.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {s.notes}</p>}
+                      <div className="flex space-x-2 pt-1">
+                        <button 
+                          onClick={() => {
+                            setEditingSocio(s);
+                            setSelectedSocioLeadId(s.lead_id || '');
+                            setSelectedMembresiaId(s.membresia_id || '');
+                            setPaymentStatus(s.payment_status || 'Pagado');
+                            setNotasSocio(s.notes || '');
+                            setIsSocioModalOpen(true);
+                          }}
+                          className="flex-1 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold"
+                        >
+                          Editar
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteSocio(s.id)}
+                          className="px-3 py-1.5 bg-red-600/20 text-red-400 rounded-lg text-xs font-bold"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex space-x-4 overflow-x-auto pb-4">
+                {membresias.map((m) => {
+                  const membresiaSocios = socios.filter((s) => s.membresia_id === m.id);
+                  return (
+                    <div key={m.id} className="w-72 flex-shrink-0 bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col max-h-[70vh]">
+                      <h3 className="font-bold text-xs text-blue-400 mb-1 uppercase">🏷️ {m.nombre}</h3>
+                      <p className="text-[10px] text-gray-400 mb-3">Secciones: {m.secciones || 'N/A'} • ${m.precio}</p>
+                      <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+                        {membresiaSocios.map((s) => (
+                          <div key={s.id} className="bg-slate-950 p-3 rounded-lg shadow-sm border border-slate-800 space-y-1">
+                            <p className="font-bold text-xs text-white">{s.leads?.full_name || s.leads?.name || 'Socio'}</p>
+                            <p className="text-[11px] text-green-400">Estado: {s.payment_status}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {currentTab === 'membresias' && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-base font-bold text-white">Membresías y Secciones ({membresias.length})</h2>
+              <button 
+                onClick={() => {
+                  setEditingMembresia(null);
+                  setNombreMembresia('');
+                  setSeccionesMembresia('');
+                  setPrecioMembresia('');
+                  setIsMembresiaModalOpen(true);
+                }} 
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow"
+              >
+                + Nueva Membresía
+              </button>
+            </div>
+
+            {loadingMembresias ? (
+              <p className="text-center text-gray-500 py-10 text-xs">Cargando membresías...</p>
+            ) : membresias.length === 0 ? (
+              <p className="text-center text-gray-500 py-10 text-xs">No hay membresías creadas.</p>
+            ) : (
+              <div className="space-y-2">
+                {membresias.map((m) => (
+                  <div key={m.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex justify-between items-center shadow-sm">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{m.nombre}</h4>
+                      <p className="text-xs text-gray-400">Secciones: <span className="text-blue-300">{m.secciones || 'General'}</span> • Precio: <span className="text-green-400 font-bold">${m.precio}</span></p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => {
+                          setEditingMembresia(m);
+                          setNombreMembresia(m.nombre || '');
+                          setSeccionesMembresia(m.secciones || '');
+                          setPrecioMembresia(m.precio ? m.precio.toString() : '');
+                          setIsMembresiaModalOpen(true);
+                        }}
+                        className="px-2.5 py-1 bg-slate-800 text-gray-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-slate-700 transition"
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteMembresia(m.id)}
+                        className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1031,7 +1251,6 @@ export default function CRMPage() {
               </div>
             </div>
 
-            {/* GRÁFICA DE BARRAS DE ESTADOS DE LEADS */}
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-lg">
               <h3 className="font-bold text-sm text-white">Gráfica de Estados de Leads</h3>
               <div className="space-y-3">
@@ -1299,6 +1518,13 @@ export default function CRMPage() {
                 </select>
               </div>
               <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Tipo de Membresía</label>
+                <select required value={selectedMembresiaId} onChange={e => setSelectedMembresiaId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
+                  <option value="">Selecciona una Membresía</option>
+                  {membresias.map(m => <option key={m.id} value={m.id}>{m.nombre} (${m.precio})</option>)}
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Estado de Pago</label>
                 <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
                   <option value="Pagado">Pagado</option>
@@ -1313,6 +1539,34 @@ export default function CRMPage() {
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setIsSocioModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
                 <button type="submit" disabled={savingSocio} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingSocio ? 'Guardando...' : 'Guardar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MEMBRESIA */}
+      {isMembresiaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsMembresiaModalOpen(false)}></div>
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
+            <h3 className="text-lg font-bold text-white">{editingMembresia ? 'Editar Membresía' : 'Nueva Membresía'}</h3>
+            <form onSubmit={handleCreateOrUpdateMembresia} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Nombre de la Membresía</label>
+                <input type="text" required placeholder="Ej. Plan Musculación Full" value={nombreMembresia} onChange={e => setNombreMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Secciones (Ej. Musculación, Cardio, Pileta)</label>
+                <input type="text" placeholder="Ej. Zona Pesas y Cardio" value={seccionesMembresia} onChange={e => setSeccionesMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Precio</label>
+                <input type="number" required placeholder="Ej. 15000" value={precioMembresia} onChange={e => setPrecioMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setIsMembresiaModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={savingMembresia} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingMembresia ? 'Guardando...' : 'Guardar'}</button>
               </div>
             </form>
           </div>
