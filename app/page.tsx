@@ -1075,7 +1075,7 @@ export default function CRMPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-300 mb-1">Dirección del Local</label>
-                      <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={nuevoDireccion} onChange={e => setNuevaDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                      <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={nuevaDireccion} onChange={e => setNuevaDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                     </div>
                   </div>
                   <div>
@@ -1639,4 +1639,3 @@ export default function CRMPage() {
     </div>
   );
 }
-// lint-fix-vercel-eol-bypass
