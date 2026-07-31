@@ -192,10 +192,9 @@ export default function CRMPage() {
   };
 
   const fetchDirige = async () => {
-    if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingLeads(true);
     let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
-    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
+    if (userProfile?.role !== 'superadmin' && userProfile?.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -204,10 +203,9 @@ export default function CRMPage() {
   };
 
   const fetchCitas = async () => {
-    if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingCitas(true);
     let query = supabase.from('appointments').select('*, leads(id, full_name, name, phone)');
-    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
+    if (userProfile?.role !== 'superadmin' && userProfile?.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -216,10 +214,9 @@ export default function CRMPage() {
   };
 
   const fetchSocios = async () => {
-    if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingSocios(true);
     let query = supabase.from('socios').select('*, leads(id, full_name, name, phone), membresias(id, nombre, secciones, precio)');
-    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
+    if (userProfile?.role !== 'superadmin' && userProfile?.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -228,10 +225,9 @@ export default function CRMPage() {
   };
 
   const fetchMembresias = async () => {
-    if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingMembresias(true);
     let query = supabase.from('membresias').select('*');
-    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
+    if (userProfile?.role !== 'superadmin' && userProfile?.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -240,10 +236,9 @@ export default function CRMPage() {
   };
 
   const fetchTeam = async () => {
-    if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingTeam(true);
     let query = supabase.from('profiles').select('*');
-    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
+    if (userProfile?.role !== 'superadmin' && userProfile?.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -405,16 +400,18 @@ export default function CRMPage() {
         alert('Error al actualizar lead: ' + error.message);
       }
     } else {
-      const { error } = await supabase.from('leads').insert([{ 
+      const payload: any = { 
         full_name: nombre, 
         name: nombre,
         phone: telefono, 
         email: correo || null, 
         origin,
         status: leadStatus,
-        notes: notasLead || null,
-        empresa_id: empresaId
-      }]);
+        notes: notasLead || null
+      };
+      if (empresaId) payload.empresa_id = empresaId;
+
+      const { error } = await supabase.from('leads').insert([payload]);
       setSavingLead(false);
       if (!error) {
         setNombre('');
@@ -440,7 +437,8 @@ export default function CRMPage() {
 
   const handleCreateOrUpdateCita = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedLeadId && !editingCita) {
+    const targetLeadId = selectedLeadId || editingCita?.lead_id;
+    if (!targetLeadId) {
       alert('Por favor selecciona un lead válido');
       return;
     }
@@ -451,14 +449,14 @@ export default function CRMPage() {
     const formattedTime = horaCita || '00:00';
     const isoScheduledAt = new Date(`${formattedDate}T${formattedTime}:00`).toISOString();
 
-    const payload = {
-      lead_id: selectedLeadId || editingCita?.lead_id,
+    const payload: any = {
+      lead_id: targetLeadId,
       appointment_date: formattedDate,
       appointment_time: formattedTime,
       scheduled_at: isoScheduledAt,
       notes: notasCita || null,
-      empresa_id: empresaId
     };
+    if (empresaId) payload.empresa_id = empresaId;
 
     if (editingCita) {
       const { error } = await supabase.from('appointments').update(payload).eq('id', editingCita.id);
@@ -502,13 +500,16 @@ export default function CRMPage() {
     if (!leadId) return;
     const empresaId = userProfile?.empresa_id || null;
     const defaultMembresiaId = membresias.length > 0 ? membresias[0].id : null;
-    const { error } = await supabase.from('socios').insert([{
+    
+    const payload: any = {
       lead_id: leadId,
       membresia_id: defaultMembresiaId,
       payment_status: 'Pagado',
-      notes: 'Convertido directamente desde CRM',
-      empresa_id: empresaId
-    }]);
+      notes: 'Convertido directamente desde CRM'
+    };
+    if (empresaId) payload.empresa_id = empresaId;
+
+    const { error } = await supabase.from('socios').insert([payload]);
     if (!error) {
       await supabase.from('leads').update({ status: 'CITA AGENDA' }).eq('id', leadId);
       fetchSocios();
@@ -524,13 +525,13 @@ export default function CRMPage() {
     setSavingSocio(true);
     const empresaId = userProfile?.empresa_id || null;
 
-    const payload = {
+    const payload: any = {
       lead_id: selectedSocioLeadId || editingSocio?.lead_id,
       membresia_id: selectedMembresiaId || null,
       payment_status: paymentStatus,
       notes: notasSocio || null,
-      empresa_id: empresaId
     };
+    if (empresaId) payload.empresa_id = empresaId;
 
     if (editingSocio) {
       const { error } = await supabase.from('socios').update(payload).eq('id', editingSocio.id);
@@ -579,12 +580,12 @@ export default function CRMPage() {
     setSavingMembresia(true);
     const empresaId = userProfile?.empresa_id || null;
 
-    const payload = {
+    const payload: any = {
       nombre: nombreMembresia,
       secciones: seccionesMembresia || null,
       precio: precioMembresia ? parseFloat(precioMembresia) : 0,
-      empresa_id: empresaId
     };
+    if (empresaId) payload.empresa_id = empresaId;
 
     if (editingMembresia) {
       const { error } = await supabase.from('membresias').update(payload).eq('id', editingMembresia.id);
@@ -710,7 +711,6 @@ export default function CRMPage() {
   };
 
   const totalLeadsCount = dirige.length;
-  const totalCitasCount = equipoCitas.length;
   const totalSociosCount = socios.length;
   const conversionRate = totalLeadsCount > 0 ? Math.round((totalSociosCount / totalLeadsCount) * 100) : 0;
   const failureRate = 100 - conversionRate;
@@ -1075,7 +1075,7 @@ export default function CRMPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-300 mb-1">Dirección del Local</label>
-                      <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={nuevoDireccion} onChange={e => setNuevoDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                      <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={nuevoDireccion} onChange={e => setNuevaDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                     </div>
                   </div>
                   <div>
@@ -1602,6 +1602,26 @@ export default function CRMPage() {
                 <button type="submit" disabled={savingUser} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingUser ? 'Guardando...' : 'Guardar'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ONBOARDING MODAL */}
+      {isOnboardingOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsOnboardingOpen(false)}></div>
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl z-10 space-y-4">
+            <h3 className="text-lg font-bold text-white">🚀 Guía de Bienvenida</h3>
+            <div className="space-y-3 text-xs text-gray-300 leading-relaxed">
+              <p>Bienvenido a tu CRM. Aquí tienes los pasos recomendados para empezar:</p>
+              <ul className="list-disc pl-5 space-y-1.5">
+                <li><strong className="text-white">Dirige:</strong> Registra y administra tus prospectos o leads.</li>
+                <li><strong className="text-white">Citas:</strong> Programa reuniones o llamadas con fecha y hora.</li>
+                <li><strong className="text-white">Clientes:</strong> Convierte leads en clientes activos vinculándolos a un plan.</li>
+                <li><strong className="text-white">Planes:</strong> Crea tus paquetes y membresías comerciales.</li>
+              </ul>
+            </div>
+            <button type="button" onClick={() => setIsOnboardingOpen(false)} className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold">¡Entendido!</button>
           </div>
         </div>
       )}
