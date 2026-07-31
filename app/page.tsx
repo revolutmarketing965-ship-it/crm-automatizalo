@@ -44,6 +44,7 @@ export default function CRMPage() {
   const [editingLead, setEditingLead] = useState<any>(null);
   const [editingCita, setEditingCita] = useState<any>(null);
   const [editingSocio, setEditingSocio] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<any>(null);
 
   const [currentNoteTarget, setCurrentNoteTarget] = useState<{ type: 'lead' | 'cita' | 'socio', id: string, name: string, notes: string } | null>(null);
   const [savingNote, setSavingNote] = useState(false);
@@ -117,14 +118,14 @@ export default function CRMPage() {
 
   const fetchCitas = async () => {
     setLoadingCitas(true);
-    const { data } = await supabase.from('appointments').select('*, leads(full_name, name, phone)');
+    const { data } = await supabase.from('appointments').select('*, leads(id, full_name, name, phone)');
     if (data) setEquipoCitas(data);
     setLoadingCitas(false);
   };
 
   const fetchSocios = async () => {
     setLoadingSocios(true);
-    const { data } = await supabase.from('socios').select('*, leads(full_name, name, phone)');
+    const { data } = await supabase.from('socios').select('*, leads(id, full_name, name, phone)');
     if (data) setSocios(data);
     setLoadingSocios(false);
   };
@@ -272,6 +273,24 @@ export default function CRMPage() {
     else alert('Error al eliminar cita: ' + error.message);
   };
 
+  const handleConvertLeadToSocio = async (leadId: string) => {
+    if (!leadId) return;
+    const { error } = await supabase.from('socios').insert([{
+      lead_id: leadId,
+      payment_status: 'Pagado',
+      notes: 'Convertido directamente desde Citas/Leads'
+    }]);
+    if (!error) {
+      // Opcional: actualizar el estado del lead a CITA AGENDA o cerrar ciclo
+      await supabase.from('leads').update({ status: 'CITA AGENDA' }).eq('id', leadId);
+      fetchSocios();
+      fetchDirige();
+      alert('¡Socio registrado con éxito!');
+    } else {
+      alert('Error al registrar socio: ' + error.message);
+    }
+  };
+
   const handleCreateOrUpdateSocio = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingSocio(true);
@@ -350,24 +369,46 @@ export default function CRMPage() {
     }
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleCreateOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingUser(true);
-    const { error } = await supabase.auth.signUp({
-      email: nuevoEmail,
-      password: nuevoPassword,
-      options: { data: { full_name: nuevoNombre, role: nuevoRol } }
-    });
-    setSavingUser(false);
-    if (!error) {
-      alert('Usuario creado con éxito');
-      setNuevoNombre('');
-      setNuevoEmail('');
-      setNuevoPassword('');
-      setIsUserModalOpen(false);
-      fetchTeam();
+
+    if (editingUser) {
+      const { error } = await supabase.from('profiles').update({
+        full_name: nuevoNombre,
+        role: nuevoRol
+      }).eq('id', editingUser.id);
+      setSavingUser(false);
+      if (!error) {
+        alert('Usuario actualizado con éxito');
+        setEditingUser(null);
+        setNuevoNombre('');
+        setNuevoEmail('');
+        setNuevoPassword('');
+        setNuevoRol('vendedor');
+        setIsUserModalOpen(false);
+        fetchTeam();
+      } else {
+        alert('Error al actualizar usuario: ' + error.message);
+      }
     } else {
-      alert('Error al crear usuario: ' + error.message);
+      const { error } = await supabase.auth.signUp({
+        email: nuevoEmail,
+        password: nuevoPassword,
+        options: { data: { full_name: nuevoNombre, role: nuevoRol } }
+      });
+      setSavingUser(false);
+      if (!error) {
+        alert('Usuario creado con éxito');
+        setNuevoNombre('');
+        setNuevoEmail('');
+        setNuevoPassword('');
+        setNuevoRol('vendedor');
+        setIsUserModalOpen(false);
+        fetchTeam();
+      } else {
+        alert('Error al crear usuario: ' + error.message);
+      }
     }
   };
 
@@ -388,6 +429,13 @@ export default function CRMPage() {
   const totalSociosCount = socios.length;
   const conversionRate = totalLeadsCount > 0 ? Math.round((totalSociosCount / totalLeadsCount) * 100) : 0;
   const failureRate = 100 - conversionRate;
+
+  // Estadísticas para gráfica de barras de estados
+  const statusCounts = statuses.map((st) => {
+    const count = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === st).length;
+    const percentage = totalLeadsCount > 0 ? Math.round((count / totalLeadsCount) * 100) : 0;
+    return { status: st, count, percentage };
+  });
 
   if (authLoading) {
     return (
@@ -544,15 +592,19 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl z-10 space-y-5 text-gray-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🚀</span> <span>Onboarding & Gestión</span>
+                <span>🚀</span> <span>Guía y Novedades</span>
               </h3>
               <button onClick={() => setIsOnboardingOpen(false)} className="text-gray-400 hover:text-white font-bold text-lg">✕</button>
             </div>
             
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">1. Selector de Estado Directo</h4>
-                <p>Modifica el estado de cada lead directamente desde el selector de color ubicado en la parte superior de su tarjeta o renglón.</p>
+                <h4 className="font-bold text-blue-400 text-sm">1. Volver Socio desde Citas</h4>
+                <p>Ahora puedes convertir directamente una cita o lead en socio activo con el botón verde correspondiente.</p>
+              </div>
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
+                <h4 className="font-bold text-blue-400 text-sm">2. Gráfica de Estados</h4>
+                <p>Visualiza el rendimiento de tus prospectos en la pestaña Métricas a través de la nueva gráfica de barras.</p>
               </div>
             </div>
 
@@ -560,7 +612,7 @@ export default function CRMPage() {
               onClick={() => setIsOnboardingOpen(false)}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow"
             >
-              ¡Entendido, Comenzar!
+              ¡Entendido, Continuar!
             </button>
           </div>
         </div>
@@ -628,7 +680,6 @@ export default function CRMPage() {
                   return (
                     <div key={l.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
                       <div className="flex-1 space-y-1.5 w-full">
-                        {/* Selector de estado editable arriba */}
                         <div className="flex items-center space-x-2">
                           <select
                             value={currentLeadStatus}
@@ -653,11 +704,20 @@ export default function CRMPage() {
                       </div>
                       <div className="flex items-center space-x-2 w-full sm:w-auto justify-end pt-2 sm:pt-0">
                         <button 
+                          onClick={() => handleConvertLeadToSocio(l.id)}
+                          className="px-3 py-1.5 bg-emerald-600/30 text-emerald-400 border border-emerald-600/50 rounded-lg text-xs font-bold hover:bg-emerald-600 hover:text-white transition"
+                        >
+                          ✨ Socio
+                        </button>
+                        <button 
                           onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
                           className="px-3 py-1.5 bg-blue-600/30 text-blue-400 border border-blue-600/50 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition"
                         >
                           📅 Agendar
                         </button>
+                        <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
+                          WhatsApp
+                        </a>
                         <button 
                           onClick={() => {
                             setEditingLead(l);
@@ -679,9 +739,6 @@ export default function CRMPage() {
                         >
                           Eliminar
                         </button>
-                        <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
-                          WhatsApp
-                        </a>
                       </div>
                     </div>
                   );
@@ -721,10 +778,19 @@ export default function CRMPage() {
                       {l.email && <p className="text-xs text-gray-400">✉️ {l.email}</p>}
                       {l.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
                       
-                      <div className="flex space-x-2 pt-1">
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="flex-1 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold text-center">
+                          WhatsApp
+                        </a>
+                        <button 
+                          onClick={() => handleConvertLeadToSocio(l.id)}
+                          className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold"
+                        >
+                          Socio
+                        </button>
                         <button 
                           onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
-                          className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold"
+                          className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold"
                         >
                           Agendar
                         </button>
@@ -739,15 +805,15 @@ export default function CRMPage() {
                             setNotasLead(l.notes || '');
                             setIsLeadModalOpen(true);
                           }}
-                          className="px-3 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold"
+                          className="px-2 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold"
                         >
                           Editar
                         </button>
                         <button 
                           onClick={() => handleDeleteLead(l.id)}
-                          className="px-3 py-2 bg-red-600/20 text-red-400 rounded-lg text-xs font-bold"
+                          className="px-2 py-1.5 bg-red-600/20 text-red-400 rounded-lg text-xs font-bold"
                         >
-                          Eliminar
+                          ✕
                         </button>
                       </div>
                     </div>
@@ -770,7 +836,8 @@ export default function CRMPage() {
                           <div key={lead.id} className="bg-slate-950 p-3 rounded-lg shadow-sm border border-slate-800 space-y-1">
                             <p className="font-bold text-xs text-white">{lead.full_name || lead.name}</p>
                             <p className="text-[11px] text-gray-400">{lead.phone}</p>
-                            <div className="flex justify-end space-x-1 pt-1">
+                            <div className="flex justify-between items-center pt-1">
+                              <a href={getWhatsAppLink(lead.phone, lead.full_name || lead.name)} target="_blank" rel="noreferrer" className="text-green-400 text-[10px] font-bold underline">WhatsApp</a>
                               <button onClick={() => { setSelectedLeadId(lead.id); setIsCitaModalOpen(true); }} className="px-2 py-0.5 bg-blue-600 text-white text-[10px] rounded font-bold">
                                 Agendar
                               </button>
@@ -810,44 +877,62 @@ export default function CRMPage() {
               <p className="text-center text-gray-500 py-10 text-xs">No hay citas registradas.</p>
             ) : (
               <div className="space-y-2">
-                {equipoCitas.map((c) => (
-                  <div key={c.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center shadow-sm">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-bold text-white text-sm">{c.leads?.full_name || c.leads?.name || 'Cliente'}</h4>
+                {equipoCitas.map((c) => {
+                  const leadObj = c.leads;
+                  const leadName = leadObj?.full_name || leadObj?.name || 'Cliente';
+                  const leadPhone = leadObj?.phone || '';
+                  const leadId = leadObj?.id || c.lead_id;
+
+                  return (
+                    <div key={c.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-bold text-white text-sm">{leadName}</h4>
+                          <button 
+                            onClick={() => setCurrentNoteTarget({ type: 'cita', id: c.id, name: leadName, notes: c.notes || '' })}
+                            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
+                          >
+                            📝 {c.notes ? 'Ver Nota' : '+ Nota'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-amber-400 mt-0.5">📅 Fecha: {c.appointment_date} {c.appointment_time ? `• ⏰ ${c.appointment_time}` : ''}</p>
+                        {c.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {c.notes}</p>}
+                      </div>
+                      <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
                         <button 
-                          onClick={() => setCurrentNoteTarget({ type: 'cita', id: c.id, name: c.leads?.full_name || 'Cita', notes: c.notes || '' })}
-                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
+                          onClick={() => handleConvertLeadToSocio(leadId)}
+                          className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
                         >
-                          📝 {c.notes ? 'Ver Nota' : '+ Nota'}
+                          ✨ Volver Socio
+                        </button>
+                        {leadPhone && (
+                          <a href={getWhatsAppLink(leadPhone, leadName)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
+                            WhatsApp
+                          </a>
+                        )}
+                        <button 
+                          onClick={() => {
+                            setEditingCita(c);
+                            setSelectedLeadId(c.lead_id || '');
+                            setFechaCita(c.appointment_date || '');
+                            setHoraCita(c.appointment_time || '');
+                            setNotasCita(c.notes || '');
+                            setIsCitaModalOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition"
+                        >
+                          Editar
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCita(c.id)}
+                          className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+                        >
+                          Eliminar
                         </button>
                       </div>
-                      <p className="text-xs text-amber-400 mt-0.5">📅 Fecha: {c.appointment_date} {c.appointment_time ? `• ⏰ ${c.appointment_time}` : ''}</p>
-                      {c.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {c.notes}</p>}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <button 
-                        onClick={() => {
-                          setEditingCita(c);
-                          setSelectedLeadId(c.lead_id || '');
-                          setFechaCita(c.appointment_date || '');
-                          setHoraCita(c.appointment_time || '');
-                          setNotasCita(c.notes || '');
-                          setIsCitaModalOpen(true);
-                        }}
-                        className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition"
-                      >
-                        Editar
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteCita(c.id)}
-                        className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -946,6 +1031,27 @@ export default function CRMPage() {
               </div>
             </div>
 
+            {/* GRÁFICA DE BARRAS DE ESTADOS DE LEADS */}
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-lg">
+              <h3 className="font-bold text-sm text-white">Gráfica de Estados de Leads</h3>
+              <div className="space-y-3">
+                {statusCounts.map((item) => (
+                  <div key={item.status} className="space-y-1">
+                    <div className="flex justify-between text-xs text-gray-300">
+                      <span className="font-bold">{item.status}</span>
+                      <span className="font-mono">{item.count} leads ({item.percentage}%)</span>
+                    </div>
+                    <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                      <div 
+                        className="bg-blue-600 h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${item.percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
               <h4 className="font-bold text-white text-sm">Resumen General</h4>
               <div className="flex justify-between text-xs text-gray-300 border-b border-slate-800 py-1.5">
@@ -1003,7 +1109,17 @@ export default function CRMPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
               <h2 className="text-base font-bold text-white">Gestión de Equipo</h2>
-              <button onClick={() => setIsUserModalOpen(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">
+              <button 
+                onClick={() => {
+                  setEditingUser(null);
+                  setNuevoNombre('');
+                  setNuevoEmail('');
+                  setNuevoPassword('');
+                  setNuevoRol('vendedor');
+                  setIsUserModalOpen(true);
+                }} 
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow"
+              >
                 + Crear Usuario
               </button>
             </div>
@@ -1019,12 +1135,25 @@ export default function CRMPage() {
                       <h4 className="font-bold text-white text-sm">{p.full_name || 'Usuario'}</h4>
                       <p className="text-xs text-gray-400">Rol: <span className="text-blue-400 font-bold uppercase">{p.role || 'Vendedor'}</span></p>
                     </div>
-                    <button 
-                      onClick={() => handleDeleteUser(p.id)}
-                      className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
-                    >
-                      Eliminar
-                    </button>
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => {
+                          setEditingUser(p);
+                          setNuevoNombre(p.full_name || '');
+                          setNuevoRol(p.role || 'vendedor');
+                          setIsUserModalOpen(true);
+                        }}
+                        className="px-2.5 py-1 bg-slate-800 text-gray-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-slate-700 transition"
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteUser(p.id)}
+                        className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1190,23 +1319,39 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* MODAL USUARIO */}
+      {/* MODAL USUARIO / EQUIPO */}
       {isUserModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsUserModalOpen(false)}></div>
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
-            <h3 className="text-lg font-bold text-white">Crear Usuario / Vendedor</h3>
-            <form onSubmit={handleCreateUser} className="space-y-3">
-              <input type="text" required placeholder="Nombre Completo" value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
-              <input type="email" required placeholder="Correo electrónico" value={nuevoEmail} onChange={e => setNuevoEmail(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
-              <input type="password" required placeholder="Contraseña" value={nuevoPassword} onChange={e => setNuevoPassword(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
-              <select value={nuevoRol} onChange={e => setNuevoRol(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
-                <option value="vendedor">Vendedor</option>
-                <option value="administrador">Administrador</option>
-              </select>
+            <h3 className="text-lg font-bold text-white">{editingUser ? 'Editar Miembro de Equipo' : 'Crear Usuario / Vendedor'}</h3>
+            <form onSubmit={handleCreateOrUpdateUser} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Nombre Completo</label>
+                <input type="text" required placeholder="Nombre Completo" value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              {!editingUser && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Correo electrónico</label>
+                    <input type="email" required placeholder="correo@ejemplo.com" value={nuevoEmail} onChange={e => setNuevoEmail(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Contraseña</label>
+                    <input type="password" required placeholder="Contraseña" value={nuevoPassword} onChange={e => setNuevoPassword(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                  </div>
+                </>
+              )}
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Rol</label>
+                <select value={nuevoRol} onChange={e => setNuevoRol(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
+                  <option value="vendedor">Vendedor</option>
+                  <option value="administrador">Administrador</option>
+                </select>
+              </div>
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
-                <button type="submit" disabled={savingUser} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingUser ? 'Creando...' : 'Crear'}</button>
+                <button type="submit" disabled={savingUser} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingUser ? 'Guardando...' : (editingUser ? 'Actualizar' : 'Crear')}</button>
               </div>
             </form>
           </div>
