@@ -377,7 +377,7 @@ export default function CRMPage() {
   const handleCreateOrUpdateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingLead(true);
-    const empresaId = userProfile?.empresa_id;
+    const empresaId = userProfile?.empresa_id || null;
 
     if (editingLead) {
       const { error } = await supabase.from('leads').update({
@@ -443,7 +443,7 @@ export default function CRMPage() {
       return;
     }
     setSavingCita(true);
-    const empresaId = userProfile?.empresa_id;
+    const empresaId = userProfile?.empresa_id || null;
     
     const formattedDate = fechaCita || new Date().toISOString().split('T')[0];
     const formattedTime = horaCita || '00:00';
@@ -498,7 +498,7 @@ export default function CRMPage() {
 
   const handleConvertLeadToSocio = async (leadId: string) => {
     if (!leadId) return;
-    const empresaId = userProfile?.empresa_id;
+    const empresaId = userProfile?.empresa_id || null;
     const defaultMembresiaId = membresias.length > 0 ? membresias[0].id : null;
     const { error } = await supabase.from('socios').insert([{
       lead_id: leadId,
@@ -520,7 +520,7 @@ export default function CRMPage() {
   const handleCreateOrUpdateSocio = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingSocio(true);
-    const empresaId = userProfile?.empresa_id;
+    const empresaId = userProfile?.empresa_id || null;
 
     const payload = {
       lead_id: selectedSocioLeadId || editingSocio?.lead_id,
@@ -575,7 +575,7 @@ export default function CRMPage() {
   const handleCreateOrUpdateMembresia = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingMembresia(true);
-    const empresaId = userProfile?.empresa_id;
+    const empresaId = userProfile?.empresa_id || null;
 
     const payload = {
       nombre: nombreMembresia,
@@ -648,7 +648,7 @@ export default function CRMPage() {
   const handleCreateOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingUser(true);
-    const empresaId = userProfile?.empresa_id;
+    const empresaId = userProfile?.empresa_id || null;
 
     if (editingUser) {
       const { error } = await supabase.from('profiles').update({
