@@ -195,7 +195,7 @@ export default function CRMPage() {
     if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingLeads(true);
     let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
-    if (userProfile.role !== 'superadmin') {
+    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -207,7 +207,7 @@ export default function CRMPage() {
     if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingCitas(true);
     let query = supabase.from('appointments').select('*, leads(id, full_name, name, phone)');
-    if (userProfile.role !== 'superadmin') {
+    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -219,7 +219,7 @@ export default function CRMPage() {
     if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingSocios(true);
     let query = supabase.from('socios').select('*, leads(id, full_name, name, phone), membresias(id, nombre, secciones, precio)');
-    if (userProfile.role !== 'superadmin') {
+    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -231,7 +231,7 @@ export default function CRMPage() {
     if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingMembresias(true);
     let query = supabase.from('membresias').select('*');
-    if (userProfile.role !== 'superadmin') {
+    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -243,7 +243,7 @@ export default function CRMPage() {
     if (!userProfile?.empresa_id && userProfile?.role !== 'superadmin') return;
     setLoadingTeam(true);
     let query = supabase.from('profiles').select('*');
-    if (userProfile.role !== 'superadmin') {
+    if (userProfile.role !== 'superadmin' && userProfile.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
     const { data } = await query;
@@ -382,6 +382,7 @@ export default function CRMPage() {
     if (editingLead) {
       const { error } = await supabase.from('leads').update({
         full_name: nombre,
+        name: nombre,
         phone: telefono,
         email: correo || null,
         origin,
@@ -406,6 +407,7 @@ export default function CRMPage() {
     } else {
       const { error } = await supabase.from('leads').insert([{ 
         full_name: nombre, 
+        name: nombre,
         phone: telefono, 
         email: correo || null, 
         origin,
@@ -1073,7 +1075,7 @@ export default function CRMPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-300 mb-1">Dirección del Local</label>
-                      <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={nuevaDireccion} onChange={e => setNuevaDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                      <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={nuevoDireccion} onChange={e => setNuevoDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                     </div>
                   </div>
                   <div>
