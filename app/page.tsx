@@ -34,7 +34,12 @@ export default function CRMPage() {
   const [isSocioModalOpen, setIsSocioModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
-  // Modal para ver y editar notas de clientes
+  // Estados para edición
+  const [editingLead, setEditingLead] = useState<any>(null);
+  const [editingCita, setEditingCita] = useState<any>(null);
+  const [editingSocio, setEditingSocio] = useState<any>(null);
+
+  // Modal de notas
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [currentNoteTarget, setCurrentNoteTarget] = useState<{ type: 'lead' | 'cita' | 'socio', id: string, name: string, notes: string } | null>(null);
   const [savingNote, setSavingNote] = useState(false);
@@ -135,93 +140,177 @@ export default function CRMPage() {
     }
   }, [session]);
 
-  const handleCreateLead = async (e: React.FormEvent) => {
+  const handleCreateOrUpdateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingLead(true);
-    const { error } = await supabase.from('leads').insert([{ 
-      full_name: nombre, 
-      phone: telefono, 
-      email: correo || null, 
-      origin,
-      notes: notasLead || null
-    }]);
-    setSavingLead(false);
-    if (!error) {
-      setNombre('');
-      setTelefono('');
-      setCorreo('');
-      setNotasLead('');
-      setIsLeadModalOpen(false);
-      fetchDirige();
+
+    if (editingLead) {
+      const { error } = await supabase.from('leads').update({
+        full_name: nombre,
+        phone: telefono,
+        email: correo || null,
+        origin,
+        notes: notasLead || null
+      }).eq('id', editingLead.id);
+
+      setSavingLead(false);
+      if (!error) {
+        setEditingLead(null);
+        setNombre('');
+        setTelefono('');
+        setCorreo('');
+        setNotasLead('');
+        setOrigen('Facebook Ads');
+        setIsLeadModalOpen(false);
+        fetchDirige();
+      } else {
+        alert('Error al actualizar lead: ' + error.message);
+      }
     } else {
-      alert('Error al guardar el lead: ' + error.message);
+      const { error } = await supabase.from('leads').insert([{ 
+        full_name: nombre, 
+        phone: telefono, 
+        email: correo || null, 
+        origin,
+        notes: notasLead || null
+      }]);
+      setSavingLead(false);
+      if (!error) {
+        setNombre('');
+        setTelefono('');
+        setCorreo('');
+        setNotasLead('');
+        setOrigen('Facebook Ads');
+        setIsLeadModalOpen(false);
+        fetchDirige();
+      } else {
+        alert('Error al guardar el lead: ' + error.message);
+      }
     }
   };
 
-  const handleCreateCita = async (e: React.FormEvent) => {
+  const handleDeleteLead = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este lead?')) return;
+    const { error } = await supabase.from('leads').delete().eq('id', id);
+    if (!error) fetchDirige();
+    else alert('Error al eliminar lead: ' + error.message);
+  };
+
+  const handleCreateOrUpdateCita = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedLeadId) {
+    if (!selectedLeadId && !editingCita) {
       alert('Por favor selecciona un lead válido');
       return;
     }
     setSavingCita(true);
-    const combinedDateTime = `${fechaCita}T${horaCita || '00:00'}:00`;
     
-    const { error } = await supabase.from('appointments').insert([{ 
-      lead_id: selectedLeadId, 
-      appointment_date: fechaCita, 
-      appointment_time: horaCita,
-      scheduled_at: combinedDateTime,
-      notes: notasCita || null
-    }]);
-    setSavingCita(false);
-    if (!error) {
-      setFechaCita('');
-      setHoraCita('');
-      setSelectedLeadId('');
-      setNotasCita('');
-      setIsCitaModalOpen(false);
-      fetchCitas();
-      alert('Cita agendada con éxito');
+    // Formato ISO válido para scheduled_at
+    const formattedDate = fechaCita || new Date().toISOString().split('T')[0];
+    const formattedTime = horaCita || '00:00';
+    const isoScheduledAt = new Date(`${formattedDate}T${formattedTime}:00`).toISOString();
+
+    if (editingCita) {
+      const { error } = await supabase.from('appointments').update({
+        appointment_date: formattedDate,
+        appointment_time: formattedTime,
+        scheduled_at: isoScheduledAt,
+        notes: notasCita || null
+      }).eq('id', editingCita.id);
+
+      setSavingCita(false);
+      if (!error) {
+        setEditingCita(null);
+        setFechaCita('');
+        setHoraCita('');
+        setNotasCita('');
+        setSelectedLeadId('');
+        setIsCitaModalOpen(false);
+        fetchCitas();
+      } else {
+        alert('Error al actualizar cita: ' + error.message);
+      }
     } else {
-      alert('Error al agendar cita: ' + error.message);
+      const { error } = await supabase.from('appointments').insert([{ 
+        lead_id: selectedLeadId, 
+        appointment_date: formattedDate, 
+        appointment_time: formattedTime,
+        scheduled_at: isoScheduledAt,
+        notes: notasCita || null
+      }]);
+      setSavingCita(false);
+      if (!error) {
+        setFechaCita('');
+        setHoraCita('');
+        setSelectedLeadId('');
+        setNotasCita('');
+        setIsCitaModalOpen(false);
+        fetchCitas();
+        alert('Cita agendada con éxito');
+      } else {
+        alert('Error al agendar cita: ' + error.message);
+      }
     }
   };
 
-  const handleCreateSocio = async (e: React.FormEvent) => {
+  const handleDeleteCita = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar esta cita?')) return;
+    const { error } = await supabase.from('appointments').delete().eq('id', id);
+    if (!error) fetchCitas();
+    else alert('Error al eliminar cita: ' + error.message);
+  };
+
+  const handleCreateOrUpdateSocio = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSocioLeadId) {
-      alert('Por favor selecciona un lead válido');
-      return;
-    }
     setSavingSocio(true);
-    const { error } = await supabase.from('socios').insert([{ 
-      lead_id: selectedSocioLeadId, 
-      payment_status: paymentStatus,
-      notes: notasSocio || null
-    }]);
-    setSavingSocio(false);
-    if (!error) {
-      setSelectedSocioLeadId('');
-      setNotasSocio('');
-      setIsSocioModalOpen(false);
-      fetchSocios();
+
+    if (editingSocio) {
+      const { error } = await supabase.from('socios').update({
+        payment_status: paymentStatus,
+        notes: notasSocio || null
+      }).eq('id', editingSocio.id);
+
+      setSavingSocio(false);
+      if (!error) {
+        setEditingSocio(null);
+        setSelectedSocioLeadId('');
+        setPaymentStatus('Pagado');
+        setNotasSocio('');
+        setIsSocioModalOpen(false);
+        fetchSocios();
+      } else {
+        alert('Error al actualizar socio: ' + error.message);
+      }
     } else {
-      alert('Error al registrar socio: ' + error.message);
+      if (!selectedSocioLeadId) {
+        alert('Por favor selecciona un lead válido');
+        setSavingSocio(false);
+        return;
+      }
+      const { error } = await supabase.from('socios').insert([{ 
+        lead_id: selectedSocioLeadId, 
+        payment_status: paymentStatus,
+        notes: notasSocio || null
+      }]);
+      setSavingSocio(false);
+      if (!error) {
+        setSelectedSocioLeadId('');
+        setPaymentStatus('Pagado');
+        setNotasSocio('');
+        setIsSocioModalOpen(false);
+        fetchSocios();
+      } else {
+        alert('Error al registrar socio: ' + error.message);
+      }
     }
   };
 
   const handleDeleteSocio = async (socioId: string) => {
     if (!confirm('¿Estás seguro de eliminar este socio?')) return;
     const { error } = await supabase.from('socios').delete().eq('id', socioId);
-    if (!error) {
-      fetchSocios();
-    } else {
-      alert('No se pudo eliminar el socio.');
-    }
+    if (!error) fetchSocios();
+    else alert('No se pudo eliminar el socio.');
   };
 
-  // Función para actualizar notas de cualquier elemento
   const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentNoteTarget) return;
@@ -273,11 +362,8 @@ export default function CRMPage() {
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
     const { error } = await supabase.from('profiles').delete().eq('id', userId);
-    if (!error) {
-      fetchTeam();
-    } else {
-      alert('No se pudo eliminar el registro de perfil.');
-    }
+    if (!error) fetchTeam();
+    else alert('No se pudo eliminar el registro de perfil.');
   };
 
   const getWhatsAppLink = (phone: string, leadName: string) => {
@@ -446,20 +532,20 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl z-10 space-y-5 text-gray-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🚀</span> <span>Onboarding & Notas</span>
+                <span>🚀</span> <span>Onboarding & Gestión</span>
               </h3>
               <button onClick={() => setIsOnboardingOpen(false)} className="text-gray-400 hover:text-white font-bold text-lg">✕</button>
             </div>
             
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">1. Notas en Leads, Socios y Citas</h4>
-                <p>Ahora puedes añadir notas personalizadas en cada cliente para registrar información clave y saber más de ellos en todo momento.</p>
+                <h4 className="font-bold text-blue-400 text-sm">1. Edición y Eliminación Total</h4>
+                <p>Ahora puedes editar o eliminar Leads, Citas y Socios con total flexibilidad desde sus respectivos paneles.</p>
               </div>
 
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">2. Control de Pagos</h4>
-                <p>Estados de pago diferenciados por colores: Pagado (verde), Pendiente (rojo) y Pago Parcial (naranja).</p>
+                <h4 className="font-bold text-blue-400 text-sm">2. Notas Editables</h4>
+                <p>Añade y actualiza notas directamente en cada registro para mantener la información detallada.</p>
               </div>
             </div>
 
@@ -502,7 +588,18 @@ export default function CRMPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
               <h2 className="text-base font-bold text-white">Gestión de Leads ({dirige.length})</h2>
-              <button onClick={() => setIsLeadModalOpen(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">
+              <button 
+                onClick={() => { 
+                  setEditingLead(null); 
+                  setNombre(''); 
+                  setTelefono(''); 
+                  setCorreo(''); 
+                  setOrigen('Facebook Ads'); 
+                  setNotasLead(''); 
+                  setIsLeadModalOpen(true); 
+                }} 
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow"
+              >
                 + Nuevo Lead
               </button>
             </div>
@@ -535,6 +632,26 @@ export default function CRMPage() {
                       >
                         📅 Agendar
                       </button>
+                      <button 
+                        onClick={() => {
+                          setEditingLead(l);
+                          setNombre(l.full_name || l.name || '');
+                          setTelefono(l.phone || '');
+                          setCorreo(l.email || '');
+                          setOrigen(l.origin || 'Facebook Ads');
+                          setNotasLead(l.notes || '');
+                          setIsLeadModalOpen(true);
+                        }}
+                        className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition"
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteLead(l.id)}
+                        className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+                      >
+                        Eliminar
+                      </button>
                       <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
                         WhatsApp
                       </a>
@@ -565,9 +682,26 @@ export default function CRMPage() {
                       >
                         Agendar Cita
                       </button>
-                      <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 bg-green-600 text-white rounded-lg text-xs font-bold">
-                        WhatsApp
-                      </a>
+                      <button 
+                        onClick={() => {
+                          setEditingLead(l);
+                          setNombre(l.full_name || l.name || '');
+                          setTelefono(l.phone || '');
+                          setCorreo(l.email || '');
+                          setOrigen(l.origin || 'Facebook Ads');
+                          setNotasLead(l.notes || '');
+                          setIsLeadModalOpen(true);
+                        }}
+                        className="px-3 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold"
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteLead(l.id)}
+                        className="px-3 py-2 bg-red-600/20 text-red-400 rounded-lg text-xs font-bold"
+                      >
+                        Eliminar
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -584,9 +718,14 @@ export default function CRMPage() {
                         <h4 className="font-bold text-white text-xs">{l.full_name || l.name}</h4>
                         <p className="text-[10px] text-gray-400">{l.phone}</p>
                       </div>
-                      <button onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }} className="px-2.5 py-1 bg-blue-600 text-white text-[10px] rounded font-bold">
-                        Agendar
-                      </button>
+                      <div className="space-x-1">
+                        <button onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }} className="px-2 py-1 bg-blue-600 text-white text-[10px] rounded font-bold">
+                          Agendar
+                        </button>
+                        <button onClick={() => handleDeleteLead(l.id)} className="px-2 py-1 bg-red-600/30 text-red-300 text-[10px] rounded font-bold">
+                          Borrar
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -599,7 +738,17 @@ export default function CRMPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
               <h2 className="text-base font-bold text-white">Citas Programadas</h2>
-              <button onClick={() => setIsCitaModalOpen(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">
+              <button 
+                onClick={() => { 
+                  setEditingCita(null); 
+                  setSelectedLeadId(''); 
+                  setFechaCita(''); 
+                  setHoraCita(''); 
+                  setNotasCita(''); 
+                  setIsCitaModalOpen(true); 
+                }} 
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow"
+              >
                 + Agendar Cita
               </button>
             </div>
@@ -611,7 +760,7 @@ export default function CRMPage() {
               <div className="space-y-2">
                 {equipoCitas.map((c) => (
                   <div key={c.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center shadow-sm">
-                    <div>
+                    <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <h4 className="font-bold text-white text-sm">{c.leads?.full_name || c.leads?.name || 'Cliente'}</h4>
                         <button 
@@ -624,7 +773,27 @@ export default function CRMPage() {
                       <p className="text-xs text-amber-400 mt-0.5">📅 Fecha: {c.appointment_date} {c.appointment_time ? `• ⏰ ${c.appointment_time}` : ''}</p>
                       {c.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {c.notes}</p>}
                     </div>
-                    <span className="text-[10px] bg-amber-900/40 text-amber-300 border border-amber-700 px-2 py-1 rounded-lg">Agendado</span>
+                    <div className="flex items-center space-x-2">
+                      <button 
+                        onClick={() => {
+                          setEditingCita(c);
+                          setSelectedLeadId(c.lead_id || '');
+                          setFechaCita(c.appointment_date || '');
+                          setHoraCita(c.appointment_time || '');
+                          setNotasCita(c.notes || '');
+                          setIsCitaModalOpen(true);
+                        }}
+                        className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition"
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteCita(c.id)}
+                        className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -636,7 +805,16 @@ export default function CRMPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
               <h2 className="text-base font-bold text-white">Socios Activos</h2>
-              <button onClick={() => setIsSocioModalOpen(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">
+              <button 
+                onClick={() => { 
+                  setEditingSocio(null); 
+                  setSelectedSocioLeadId(''); 
+                  setPaymentStatus('Pagado'); 
+                  setNotasSocio(''); 
+                  setIsSocioModalOpen(true); 
+                }} 
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow"
+              >
                 + Nuevo Socio
               </button>
             </div>
@@ -666,12 +844,26 @@ export default function CRMPage() {
                         <p className="text-xs text-gray-400 mt-0.5">Estado: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
                         {s.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {s.notes}</p>}
                       </div>
-                      <button 
-                        onClick={() => handleDeleteSocio(s.id)}
-                        className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
-                      >
-                        Eliminar
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={() => {
+                            setEditingSocio(s);
+                            setSelectedSocioLeadId(s.lead_id || '');
+                            setPaymentStatus(s.payment_status || 'Pagado');
+                            setNotasSocio(s.notes || '');
+                            setIsSocioModalOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition"
+                        >
+                          Editar
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteSocio(s.id)}
+                          className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -791,7 +983,15 @@ export default function CRMPage() {
       </main>
 
       <button 
-        onClick={() => setIsLeadModalOpen(true)} 
+        onClick={() => { 
+          setEditingLead(null); 
+          setNombre(''); 
+          setTelefono(''); 
+          setCorreo(''); 
+          setOrigen('Facebook Ads'); 
+          setNotasLead(''); 
+          setIsLeadModalOpen(true); 
+        }} 
         className="fixed right-5 bottom-20 md:bottom-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg z-30 transition transform active:scale-95"
       >
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -812,7 +1012,7 @@ export default function CRMPage() {
                   rows={4}
                   value={currentNoteTarget.notes}
                   onChange={e => setCurrentNoteTarget({ ...currentNoteTarget, notes: e.target.value })}
-                  placeholder="Ej. Prefiere entrenar por la mañana, le interesa musculación..."
+                  placeholder="Ej. Prefiere entrenar por la mañana..."
                   className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
                 />
               </div>
@@ -825,12 +1025,13 @@ export default function CRMPage() {
         </div>
       )}
 
+      {/* MODAL LEAD */}
       {isLeadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsLeadModalOpen(false)}></div>
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
-            <h3 className="text-lg font-bold text-white">Nuevo Prospecto</h3>
-            <form onSubmit={handleCreateLead} className="space-y-3">
+            <h3 className="text-lg font-bold text-white">{editingLead ? 'Editar Prospecto' : 'Nuevo Prospecto'}</h3>
+            <form onSubmit={handleCreateOrUpdateLead} className="space-y-3">
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Nombre</label>
                 <input type="text" required placeholder="Ej. Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
@@ -860,15 +1061,16 @@ export default function CRMPage() {
         </div>
       )}
 
+      {/* MODAL CITA */}
       {isCitaModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsCitaModalOpen(false)}></div>
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
-            <h3 className="text-lg font-bold text-white">Agendar Cita</h3>
-            <form onSubmit={handleCreateCita} className="space-y-3">
+            <h3 className="text-lg font-bold text-white">{editingCita ? 'Editar Cita' : 'Agendar Cita'}</h3>
+            <form onSubmit={handleCreateOrUpdateCita} className="space-y-3">
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Seleccionar Lead</label>
-                <select required value={selectedLeadId} onChange={e => setSelectedLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
+                <select required disabled={!!editingCita} value={selectedLeadId} onChange={e => setSelectedLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white disabled:opacity-50">
                   <option value="">Selecciona un Lead</option>
                   {dirige.map(l => <option key={l.id} value={l.id}>{l.full_name || l.name} ({l.phone})</option>)}
                 </select>
@@ -887,28 +1089,35 @@ export default function CRMPage() {
               </div>
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setIsCitaModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
-                <button type="submit" disabled={savingCita} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingCita ? 'Agendando...' : 'Agendar'}</button>
+                <button type="submit" disabled={savingCita} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingCita ? 'Guardando...' : 'Guardar'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
+      {/* MODAL SOCIO */}
       {isSocioModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsSocioModalOpen(false)}></div>
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
-            <h3 className="text-lg font-bold text-white">Nuevo Socio</h3>
-            <form onSubmit={handleCreateSocio} className="space-y-3">
-              <select required value={selectedSocioLeadId} onChange={e => setSelectedSocioLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
-                <option value="">Selecciona un Lead</option>
-                {dirige.map(l => <option key={l.id} value={l.id}>{l.full_name || l.name}</option>)}
-              </select>
-              <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
-                <option value="Pagado">Pagado</option>
-                <option value="Pendiente">Pendiente</option>
-                <option value="Pago Parcial">Pago Parcial</option>
-              </select>
+            <h3 className="text-lg font-bold text-white">{editingSocio ? 'Editar Socio' : 'Nuevo Socio'}</h3>
+            <form onSubmit={handleCreateOrUpdateSocio} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Seleccionar Lead</label>
+                <select required disabled={!!editingSocio} value={selectedSocioLeadId} onChange={e => setSelectedSocioLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white disabled:opacity-50">
+                  <option value="">Selecciona un Lead</option>
+                  {dirige.map(l => <option key={l.id} value={l.id}>{l.full_name || l.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Estado de Pago</label>
+                <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
+                  <option value="Pagado">Pagado</option>
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="Pago Parcial">Pago Parcial</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Notas de Socio (Opcional)</label>
                 <input type="text" placeholder="Ej. Pagó en efectivo plan anual" value={notasSocio} onChange={e => setNotasSocio(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
@@ -922,6 +1131,7 @@ export default function CRMPage() {
         </div>
       )}
 
+      {/* MODAL USUARIO */}
       {isUserModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsUserModalOpen(false)}></div>
@@ -951,7 +1161,7 @@ export default function CRMPage() {
         <button onClick={() => setCurrentTab('citas')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'citas' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
           <span className="text-[10px]">Citas</span>
         </button>
-        <button onClick={() => setCurrentTab('socios</h5>')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'socios' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
+        <button onClick={() => setCurrentTab('socios')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'socios' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
           <span className="text-[10px]">Socios</span>
         </button>
         <button onClick={() => setCurrentTab('metricas')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'metricas' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
