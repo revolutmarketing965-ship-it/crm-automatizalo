@@ -8,30 +8,32 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function CRMPage() {
+  const [session, setSession] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
   const [currentTab, setCurrentTab] = useState<'dirige' | 'citas' | 'socios' | 'equipo'>('dirige');
   const [activeView, setActiveView] = useState<'lista' | 'tarjetas' | 'kanban'>('lista');
 
-  // Estados de la base de datos
   const [dirige, setDirige] = useState<any[]>([]);
   const [equipoCitas, setEquipoCitas] = useState<any[]>([]);
   const [socios, setSocios] = useState<any[]>([]);
   const [perfilesEquipo, setPerfilesEquipo] = useState<any[]>([]);
 
-  // Estados de carga
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [loadingCitas, setLoadingCitas] = useState(false);
   const [loadingSocios, setLoadingSocios] = useState(false);
   const [loadingTeam, setLoadingTeam] = useState(false);
 
-  // Modales y Menús
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false); // Menú de Onboarding
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isCitaModalOpen, setIsCitaModalOpen] = useState(false);
   const [isSocioModalOpen, setIsSocioModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
-  // Campos para formularios
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [origen, setOrigen] = useState('Facebook Ads');
@@ -39,6 +41,7 @@ export default function CRMPage() {
 
   const [selectedLeadId, setSelectedLeadId] = useState('');
   const [fechaCita, setFechaCita] = useState('');
+  const [horaCita, setHoraCita] = useState('');
   const [savingCita, setSavingCita] = useState(false);
 
   const [selectedSocioLeadId, setSelectedSocioLeadId] = useState('');
@@ -51,10 +54,39 @@ export default function CRMPage() {
   const [nuevoRol, setNuevoRol] = useState('vendedor');
   const [savingUser, setSavingUser] = useState(false);
 
-  // Cargar datos
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword,
+    });
+    if (error) {
+      setLoginError('Credenciales inválidas o error al iniciar sesión.');
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   const fetchDirige = async () => {
     setLoadingLeads(true);
-    const { data } = await supabase.from('leads').select('*');
+    const { data } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
     if (data) setDirige(data);
     setLoadingLeads(false);
   };
@@ -81,11 +113,13 @@ export default function CRMPage() {
   };
 
   useEffect(() => {
-    fetchDirige();
-    fetchCitas();
-    fetchSocios();
-    fetchTeam();
-  }, []);
+    if (session) {
+      fetchDirige();
+      fetchCitas();
+      fetchSocios();
+      fetchTeam();
+    }
+  }, [session]);
 
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,10 +137,16 @@ export default function CRMPage() {
   const handleCreateCita = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingCita(true);
-    const { error } = await supabase.from('appointments').insert([{ lead_id: selectedLeadId, appointment_date: fechaCita }]);
+    const { error } = await supabase.from('appointments').insert([{ 
+      lead_id: selectedLeadId, 
+      appointment_date: fechaCita, 
+      appointment_time: horaCita 
+    }]);
     setSavingCita(false);
     if (!error) {
       setFechaCita('');
+      setHoraCita('');
+      setSelectedLeadId('');
       setIsCitaModalOpen(false);
       fetchCitas();
     }
@@ -118,6 +158,7 @@ export default function CRMPage() {
     const { error } = await supabase.from('socios').insert([{ lead_id: selectedSocioLeadId, payment_status: paymentStatus }]);
     setSavingSocio(false);
     if (!error) {
+      setSelectedSocioLeadId('');
       setIsSocioModalOpen(false);
       fetchSocios();
     }
@@ -144,10 +185,81 @@ export default function CRMPage() {
     }
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    if (!error) {
+      fetchTeam();
+    } else {
+      alert('No se pudo eliminar el registro de perfil.');
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950 text-white">
+        <p className="text-sm">Cargando aplicación...</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-slate-950 text-gray-100 p-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-6">
+          <div className="flex flex-col items-center space-y-3">
+            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg text-white font-black text-2xl">
+              A
+            </div>
+            <div className="text-center">
+              <h1 className="text-lg font-bold text-white tracking-tight">CRM AUTOMATIZALO GYM</h1>
+              <p className="text-xs text-gray-400 mt-0.5">Inicia sesión para continuar</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            {loginError && (
+              <div className="p-3 bg-red-950/50 border border-red-800 text-red-300 text-xs rounded-xl text-center">
+                {loginError}
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-bold text-gray-300 mb-1">Correo electrónico</label>
+              <input
+                type="email"
+                required
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="correo@ejemplo.com"
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-300 mb-1">Contraseña</label>
+              <input
+                type="password"
+                required
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-lg active:scale-95"
+            >
+              Iniciar Sesión
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-gray-100 font-sans pb-16 md:pb-0">
       
-      {/* 1. BARRA SUPERIOR (ESTILO AZUL OSCURO) */}
       <header className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-md">
         <div className="flex items-center space-x-3">
           <button 
@@ -158,21 +270,30 @@ export default function CRMPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="font-bold text-lg tracking-tight text-white">CRM GYM</span>
+          <div className="flex items-center space-x-2">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white text-xs shadow">
+              A
+            </div>
+            <span className="font-bold text-base tracking-tight text-white">CRM GYM</span>
+          </div>
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* Botón Onboarding */}
           <button 
             onClick={() => setIsOnboardingOpen(true)}
             className="px-3 py-1.5 bg-blue-600/30 text-blue-400 border border-blue-600/50 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition flex items-center space-x-1"
           >
             <span>🚀 Onboarding</span>
           </button>
+          <button 
+            onClick={handleLogout}
+            className="px-3 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+          >
+            Salir
+          </button>
         </div>
       </header>
 
-      {/* 2. MENÚ DESPLEGABLE LATERAL (DRAWER) */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div 
@@ -209,14 +330,14 @@ export default function CRMPage() {
               </button>
             </div>
 
-            <div className="p-4 border-t border-slate-800 text-xs text-gray-400 bg-slate-950">
-              Sesión activa como Administrador
+            <div className="p-4 border-t border-slate-800 text-xs text-gray-400 bg-slate-950 flex justify-between items-center">
+              <span>Sesión activa</span>
+              <button onClick={handleLogout} className="text-red-400 font-bold hover:underline">Cerrar Sesión</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 3. MENÚ DE ONBOARDING MODAL */}
       {isOnboardingOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm" onClick={() => setIsOnboardingOpen(false)}></div>
@@ -231,22 +352,22 @@ export default function CRMPage() {
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
                 <h4 className="font-bold text-blue-400 text-sm">1. Gestión de Prospectos (Dirige)</h4>
-                <p>Aquí ingresan de forma automática o manual tus clientes potenciales de campañas. Usa el botón flotante (+) para registrar uno nuevo.</p>
+                <p>Aquí ingresan tus clientes potenciales. Cada lead muestra la fecha y hora exacta en que se registró. Puedes derivarlos directamente a citas con el botón de agendar.</p>
               </div>
 
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
                 <h4 className="font-bold text-blue-400 text-sm">2. Vistas Adaptables</h4>
-                <p>En la parte superior puedes alternar entre **Lista**, **Tarjetas** o **Columnas** para organizar la vista según tu comodidad en el celular o PC.</p>
+                <p>Usa la barra superior para cambiar entre vista de **Lista**, **Tarjetas** o **Columnas** según prefieras.</p>
               </div>
 
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">3. Citas y Agendamientos</h4>
-                <p>Controla las visitas coordinadas con tus prospectos para asegurar cierres en la recepción del gimnasio.</p>
+                <h4 className="font-bold text-blue-400 text-sm">3. Citas Automáticas</h4>
+                <p>Al agendar una cita desde un lead, este se vincula automáticamente y guarda la fecha y hora seleccionada para la recepción del gimnasio.</p>
               </div>
 
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">4. Gestión de Usuarios y Equipo</h4>
-                <p>Crea cuentas independientes para tus recepcionistas desde la pestaña "Equipo / Usuarios" manteniendo todo sincronizado.</p>
+                <h4 className="font-bold text-blue-400 text-sm">4. Administración de Equipo</h4>
+                <p>Desde la pestaña "Equipo" puedes dar de alta nuevos accesos o eliminar miembros cuando sea necesario.</p>
               </div>
             </div>
 
@@ -260,7 +381,6 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* 4. SELECTOR DE VISTAS (SOLO EN SECCIÓN DIRIGE) */}
       {currentTab === 'dirige' && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex justify-center space-x-2 sticky top-[53px] z-10 shadow-sm">
           <button
@@ -284,10 +404,8 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* 5. CONTENIDO PRINCIPAL SEGÚN PESTAÑA */}
       <main className="flex-1 overflow-y-auto pb-24 p-4 max-w-4xl mx-auto w-full">
         
-        {/* SECCIÓN 1: DIRIGE (LEADS) */}
         {currentTab === 'dirige' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -304,14 +422,23 @@ export default function CRMPage() {
             ) : activeView === 'lista' ? (
               <div className="space-y-2">
                 {dirige.map((l) => (
-                  <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center shadow-sm">
+                  <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
                     <div>
                       <h4 className="font-bold text-white text-sm">{l.name}</h4>
                       <p className="text-xs text-gray-400">{l.phone} • <span className="text-blue-400">{l.origin}</span></p>
+                      <p className="text-[10px] text-gray-500 mt-1">Registrado: {new Date(l.created_at).toLocaleString()}</p>
                     </div>
-                    <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
-                      WhatsApp
-                    </a>
+                    <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                      <button 
+                        onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
+                        className="px-3 py-1.5 bg-blue-600/30 text-blue-400 border border-blue-600/50 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition"
+                      >
+                        📅 Agendar Cita
+                      </button>
+                      <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
+                        WhatsApp
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -321,21 +448,44 @@ export default function CRMPage() {
                   <div key={l.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-sm">
                     <h4 className="font-bold text-white text-sm">{l.name}</h4>
                     <p className="text-xs text-gray-400">📞 {l.phone}</p>
-                    <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer" className="block text-center w-full py-2 bg-green-600 text-white rounded-lg text-xs font-bold">
-                      Contactar por WhatsApp
-                    </a>
+                    <p className="text-[10px] text-gray-500">Registrado: {new Date(l.created_at).toLocaleString()}</p>
+                    <div className="flex space-x-2 pt-1">
+                      <button 
+                        onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
+                        className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold"
+                      >
+                        Agendar Cita
+                      </button>
+                      <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 bg-green-600 text-white rounded-lg text-xs font-bold">
+                        WhatsApp
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center text-gray-400 text-xs">
-                Vista de Columnas activa ({dirige.length} prospectos totales)
+              <div className="space-y-3">
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center text-gray-300 text-xs font-bold">
+                  Vista de Columnas (Total de Leads: {dirige.length})
+                </div>
+                <div className="space-y-2">
+                  {dirige.map((l) => (
+                    <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center">
+                      <div>
+                        <h4 className="font-bold text-white text-xs">{l.name}</h4>
+                        <p className="text-[10px] text-gray-400">{l.phone}</p>
+                      </div>
+                      <button onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }} className="px-2.5 py-1 bg-blue-600 text-white text-[10px] rounded font-bold">
+                        Agendar
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* SECCIÓN 2: CITAS Y AGENDAMIENTOS */}
         {currentTab === 'citas' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -354,7 +504,7 @@ export default function CRMPage() {
                   <div key={c.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center">
                     <div>
                       <h4 className="font-bold text-white text-sm">{c.leads?.name || 'Cliente'}</h4>
-                      <p className="text-xs text-amber-400">📅 Fecha: {c.appointment_date}</p>
+                      <p className="text-xs text-amber-400">📅 Fecha: {c.appointment_date} {c.appointment_time ? `• ⏰ ${c.appointment_time}` : ''}</p>
                     </div>
                     <span className="text-[10px] bg-amber-900/40 text-amber-300 border border-amber-700 px-2 py-1 rounded-lg">Agendado</span>
                   </div>
@@ -364,7 +514,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* SECCIÓN 3: SOCIOS (COMPRADORES) */}
         {currentTab === 'socios' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -392,7 +541,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* SECCIÓN 4: EQUIPO / USUARIOS */}
         {currentTab === 'equipo' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -413,6 +561,12 @@ export default function CRMPage() {
                       <h4 className="font-bold text-white text-sm">{p.full_name || 'Usuario'}</h4>
                       <p className="text-xs text-gray-400">Rol: <span className="text-blue-400 font-bold uppercase">{p.role || 'Vendedor'}</span></p>
                     </div>
+                    <button 
+                      onClick={() => handleDeleteUser(p.id)}
+                      className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+                    >
+                      Eliminar
+                    </button>
                   </div>
                 ))}
               </div>
@@ -422,7 +576,6 @@ export default function CRMPage() {
 
       </main>
 
-      {/* 6. BOTÓN FLOTANTE RÁPIDO (+) */}
       <button 
         onClick={() => setIsLeadModalOpen(true)} 
         className="fixed right-5 bottom-20 md:bottom-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg z-30 transition transform active:scale-95"
@@ -432,7 +585,6 @@ export default function CRMPage() {
         </svg>
       </button>
 
-      {/* MODALES DE CREACIÓN */}
       {isLeadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsLeadModalOpen(false)}></div>
@@ -456,11 +608,21 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
             <h3 className="text-lg font-bold text-white">Agendar Cita</h3>
             <form onSubmit={handleCreateCita} className="space-y-3">
-              <select required value={selectedLeadId} onChange={e => setSelectedLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
-                <option value="">Selecciona un Lead</option>
-                {dirige.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
-              <input type="date" required value={fechaCita} onChange={e => setFechaCita(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Seleccionar Lead</label>
+                <select required value={selectedLeadId} onChange={e => setSelectedLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
+                  <option value="">Selecciona un Lead</option>
+                  {dirige.map(l => <option key={l.id} value={l.id}>{l.name} ({l.phone})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Fecha de Cita</label>
+                <input type="date" required value={fechaCita} onChange={e => setFechaCita(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Hora de Cita</label>
+                <input type="time" required value={horaCita} onChange={e => setHoraCita(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setIsCitaModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
                 <button type="submit" disabled={savingCita} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingCita ? 'Agendando...' : 'Agendar'}</button>
@@ -515,7 +677,6 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* 7. BARRA DE NAVEGACIÓN INFERIOR (TIPO APP MÓVIL) */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around py-2 z-20 shadow-lg">
         <button onClick={() => setCurrentTab('dirige')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'dirige' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
           <span className="text-[10px]">Dirige</span>
