@@ -261,6 +261,15 @@ export default function CRMPage() {
     }
   };
 
+  const handleUpdateLeadStatusInline = async (leadId: string, newStatus: string) => {
+    const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', leadId);
+    if (!error) {
+      fetchDirige();
+    } else {
+      alert('Error al actualizar estado: ' + error.message);
+    }
+  };
+
   const handleCreateOrUpdateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingLead(true);
@@ -459,6 +468,7 @@ export default function CRMPage() {
     else alert('No se pudo eliminar el cliente.');
   };
 
+  // NUEVA FUNCIÓN CORREGIDA PARA PLANES/MEMBRESIAS CON EMPRESA_ID
   const handleCreateOrUpdateMembresia = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingMembresia(true);
@@ -619,8 +629,9 @@ export default function CRMPage() {
       <div className="flex flex-col h-screen items-center justify-center bg-slate-950 text-gray-100 p-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-6">
           <div className="flex flex-col items-center justify-center space-y-3">
-            <div className="w-16 h-16 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-2xl shadow-lg overflow-hidden p-1">
-              <img src="/logo.png" alt="Automatízalo CRM" className="w-full h-full object-contain" />
+            {/* LOGO CIRCULAR LIMPIO EN LOGIN */}
+            <div className="w-16 h-16 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-full overflow-hidden p-0.5 shadow-lg">
+              <img src="/logo.png" alt="Automatízalo CRM" className="w-full h-full object-contain rounded-full" />
             </div>
             <div className="text-center">
               <h1 className="text-lg font-bold text-white tracking-tight">AUTOMATÍZALO CRM</h1>
@@ -684,8 +695,9 @@ export default function CRMPage() {
           </button>
           
           <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-xl overflow-hidden p-0.5 shadow-sm">
-              <img src="/logo.png" alt="Logo CRM" className="w-full h-full object-contain" />
+            {/* LOGO CIRCULAR LIMPIO EN HEADER */}
+            <div className="w-9 h-9 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-full overflow-hidden p-0.5 shadow-sm">
+              <img src="/logo.png" alt="Logo CRM" className="w-full h-full object-contain rounded-full" />
             </div>
             <span className="font-bold text-sm tracking-tight text-white">
               {userProfile?.role === 'superadmin' ? 'PANEL MAESTRO (SUPERADMIN)' : 'AUTOMATÍZALO CRM'}
@@ -718,8 +730,9 @@ export default function CRMPage() {
 
           <div className="relative w-80 bg-slate-900 h-full shadow-2xl flex flex-col z-10 border-r border-slate-800">
             <div className="p-5 border-b border-slate-800 flex items-center space-x-3 bg-slate-950 text-white">
-              <div className="w-11 h-11 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-1 shadow">
-                <img src="/logo.png" alt="Logo Sidebar" className="w-full h-full object-contain" />
+              {/* LOGO CIRCULAR LIMPIO EN SIDEBAR */}
+              <div className="w-11 h-11 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-full overflow-hidden p-0.5 shadow">
+                <img src="/logo.png" alt="Logo Sidebar" className="w-full h-full object-contain rounded-full" />
               </div>
               <div>
                 <h2 className="font-bold text-sm leading-tight text-white">AUTOMATÍZALO</h2>
@@ -1279,12 +1292,20 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* MODAL MEMBRESIA */}
+      {/* MODAL MEMBRESIA CORREGIDO */}
       {isMembresiaModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsMembresiaModalOpen(false)}></div>
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
-            <h3 className="text-lg font-bold text-white">{editingMembresia ? 'Editar Plan' : 'Nuevo Plan'}</h3>
+            
+            {/* LOGO CIRCULAR LIMPIO EN MODAL */}
+            <div className="flex flex-col items-center mb-2">
+              <div className="w-12 h-12 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-full overflow-hidden p-0.5 shadow-md">
+                <img src="/logo.png" alt="Automatízalo" className="w-full h-full object-contain rounded-full" />
+              </div>
+            </div>
+
+            <h3 className="text-lg font-bold text-white text-center">{editingMembresia ? 'Editar Plan' : 'Nuevo Plan'}</h3>
             <form onSubmit={handleCreateOrUpdateMembresia} className="space-y-3">
               <div><label className="block text-xs font-bold text-gray-300 mb-1">Nombre</label><input type="text" required placeholder="Ej. Plan Full" value={nombreMembresia} onChange={e => setNombreMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
               <div><label className="block text-xs font-bold text-gray-300 mb-1">Detalles</label><input type="text" placeholder="Ej. Acceso completo" value={seccionesMembresia} onChange={e => setSeccionesMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
