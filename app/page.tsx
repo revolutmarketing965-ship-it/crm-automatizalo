@@ -29,7 +29,6 @@ export default function CRMPage() {
   const [allLeadsSuperadmin, setAllLeadsSuperadmin] = useState<any[]>([]);
   const [selectedEmpresaLeadsId, setSelectedEmpresaLeadsId] = useState<string>('todos');
   
-  // Campos unificados para CREAR negocio nuevo
   const [nuevaEmpresaNombre, setNuevaEmpresaNombre] = useState('');
   const [adminEmpresaEmail, setAdminEmpresaEmail] = useState('');
   const [adminEmpresaPass, setAdminEmpresaPass] = useState('');
@@ -39,7 +38,6 @@ export default function CRMPage() {
   const [nuevoLogoUrl, setNuevoLogoUrl] = useState('');
   const [savingEmpresa, setSavingEmpresa] = useState(false);
 
-  // Campos para EDITAR negocio existente
   const [editingEmpresa, setEditingEmpresa] = useState<any>(null);
   const [editNombre, setEditNombre] = useState('');
   const [editTelefono, setEditTelefono] = useState('');
@@ -47,9 +45,6 @@ export default function CRMPage() {
   const [editLogoUrl, setEditLogoUrl] = useState('');
 
   const [empresaActualLogo, setEmpresaActualLogo] = useState('');
-  const [savingLogo, setSavingLogo] = useState(false);
-
-  // Logo global del sistema controlado por Superadmin
   const [globalLogo, setGlobalLogo] = useState('');
 
   const statuses = [
@@ -281,24 +276,6 @@ export default function CRMPage() {
         }
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  const handleUpdateLogoEmpresa = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userProfile?.empresa_id) return;
-    setSavingLogo(true);
-    const { error } = await supabase
-      .from('empresas')
-      .update({ logo_url: nuevoLogoUrl })
-      .eq('id', userProfile.empresa_id);
-
-    setSavingLogo(false);
-    if (!error) {
-      setEmpresaActualLogo(nuevoLogoUrl);
-      alert('¡Logo actualizado con éxito!');
-    } else {
-      alert('Error al actualizar el logo: ' + error.message);
     }
   };
 
@@ -730,6 +707,18 @@ export default function CRMPage() {
     return `https://wa.me/${phone}?text=${encodeURIComponent(customizedMessage)}`;
   };
 
+  const totalLeadsCount = dirige.length;
+  const totalCitasCount = equipoCitas.length;
+  const totalSociosCount = socios.length;
+  const conversionRate = totalLeadsCount > 0 ? Math.round((totalSociosCount / totalLeadsCount) * 100) : 0;
+  const failureRate = 100 - conversionRate;
+
+  const statusCounts = statuses.map((st) => {
+    const count = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === st).length;
+    const percentage = totalLeadsCount > 0 ? Math.round((count / totalLeadsCount) * 100) : 0;
+    return { status: st, count, percentage };
+  });
+
   const activeLogoSrc = globalLogo || empresaActualLogo || '/logo.png';
 
   if (authLoading) {
@@ -906,10 +895,26 @@ export default function CRMPage() {
         </div>
       )}
 
+      {currentTab === 'dirige' && userProfile?.role !== 'superadmin' && (
+        <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex justify-center space-x-2 sticky top-[53px] z-10 shadow-sm">
+          <button onClick={() => setActiveView('lista')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeView === 'lista' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>📋 Lista</button>
+          <button onClick={() => setActiveView('tarjetas')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeView === 'tarjetas' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>📇 Tarjetas</button>
+          <button onClick={() => setActiveView('kanban')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeView === 'kanban' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>📊 Columnas</button>
+        </div>
+      )}
+
+      {currentTab === 'socios' && userProfile?.role !== 'superadmin' && (
+        <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex justify-center space-x-2 sticky top-[53px] z-10 shadow-sm">
+          <button onClick={() => setActiveSociosView('lista')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeSociosView === 'lista' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>📋 Lista</button>
+          <button onClick={() => setActiveSociosView('tarjetas')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeSociosView === 'tarjetas' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>📇 Tarjetas</button>
+          <button onClick={() => setActiveSociosView('kanban')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeSociosView === 'kanban' ? 'bg-blue-600 text-white shadow' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'}`}>📊 Columnas</button>
+        </div>
+      )}
+
       {/* CONTENIDO PRINCIPAL */}
       <main className="flex-1 overflow-y-auto pb-24 p-4 max-w-5xl mx-auto w-full">
         
-        {/* VISTA SUPERADMIN: LEADS DE TODOS LOS NEGOCIOS ORGANIZADOS POR ESTADO */}
+        {/* VISTA SUPERADMIN: LEADS DE TODOS LOS NEGOCIOS */}
         {userProfile?.role === 'superadmin' && currentTab === 'superadminLeads' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
@@ -1007,8 +1012,6 @@ export default function CRMPage() {
         {/* PANEL SUPERADMIN */}
         {userProfile?.role === 'superadmin' && currentTab === 'superadmin' && (
           <div className="space-y-6">
-            
-            {/* PANEL DE EDICIÓN O CREACIÓN UNIFICADA */}
             {editingEmpresa ? (
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 border-blue-500/50">
                 <h2 className="text-lg font-bold text-white flex items-center space-x-2">
@@ -1084,7 +1087,6 @@ export default function CRMPage() {
               </div>
             )}
 
-            {/* LISTA DE NEGOCIOS REGISTRADOS */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
               <h3 className="font-bold text-sm text-white">Negocios Registrados ({empresas.length})</h3>
               <div className="space-y-3">
@@ -1119,7 +1121,498 @@ export default function CRMPage() {
             </div>
           </div>
         )}
+
+        {/* TAB DIRIGE / LEADS */}
+        {userProfile?.role !== 'superadmin' && currentTab === 'dirige' && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-base font-bold text-white">Gestión de Leads ({dirige.length})</h2>
+              <button onClick={() => { setEditingLead(null); setNombre(''); setTelefono(''); setCorreo(''); setOrigen('Facebook Ads'); setLeadStatus('NUEVO/ SIN CONTACTAR'); setNotasLead(''); setIsLeadModalOpen(true); }} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">+ Nuevo Lead</button>
+            </div>
+
+            {loadingLeads ? (
+              <p className="text-center text-gray-500 py-10 text-xs">Cargando prospectos...</p>
+            ) : dirige.length === 0 ? (
+              <p className="text-center text-gray-500 py-10 text-xs">No hay leads registrados.</p>
+            ) : activeView === 'lista' ? (
+              <div className="space-y-2">
+                {dirige.map((l) => {
+                  const currentLeadStatus = l.status || 'NUEVO/ SIN CONTACTAR';
+                  const statusBgColor = 
+                    currentLeadStatus === 'NUEVO/ SIN CONTACTAR' ? 'bg-blue-950/80 border-blue-700 text-blue-300' :
+                    currentLeadStatus === 'EN SEGUIMIENTO' ? 'bg-amber-950/80 border-amber-700 text-amber-300' :
+                    currentLeadStatus === 'CITA AGENDA' ? 'bg-emerald-950/80 border-emerald-700 text-emerald-300' : 'bg-red-950/80 border-red-700 text-red-300';
+
+                  return (
+                    <div key={l.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
+                      <div className="flex-1 space-y-1.5 w-full">
+                        <div className="flex items-center space-x-2">
+                          <select value={currentLeadStatus} onChange={(e) => handleUpdateLeadStatusInline(l.id, e.target.value)} className={`text-[10px] font-black px-2 py-1 rounded-lg border outline-none cursor-pointer uppercase ${statusBgColor}`}>
+                            {statuses.map((st) => <option key={st} value={st} className="bg-slate-950 text-white">{st}</option>)}
+                          </select>
+                          <button onClick={() => setCurrentNoteTarget({ type: 'lead', id: l.id, name: l.full_name || l.name, notes: l.notes || '' })} className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold">📝 {l.notes ? 'Ver Nota' : '+ Nota'}</button>
+                        </div>
+                        <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
+                        <p className="text-xs text-gray-400">{l.phone} {l.email ? `• ${l.email}` : ''} • <span className="text-blue-400">{l.origin}</span></p>
+                        {l.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
+                      </div>
+                      <div className="flex items-center space-x-2 w-full sm:w-auto justify-end pt-2 sm:pt-0">
+                        <button onClick={() => handleConvertLeadToSocio(l.id)} className="px-3 py-1.5 bg-emerald-600/30 text-emerald-400 border border-emerald-600/50 rounded-lg text-xs font-bold hover:bg-emerald-600 hover:text-white transition">✨ Cliente</button>
+                        <button onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }} className="px-3 py-1.5 bg-blue-600/30 text-blue-400 border border-blue-600/50 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition">📅 Agendar</button>
+                        <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">WhatsApp</a>
+                        <button onClick={() => { setEditingLead(l); setNombre(l.full_name || l.name || ''); setTelefono(l.phone || ''); setCorreo(l.email || ''); setOrigen(l.origin || 'Facebook Ads'); setLeadStatus(l.status || 'NUEVO/ SIN CONTACTAR'); setNotasLead(l.notes || ''); setIsLeadModalOpen(true); }} className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition">Editar</button>
+                        <button onClick={() => handleDeleteLead(l.id)} className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition">Eliminar</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : activeView === 'tarjetas' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {dirige.map((l) => {
+                  const currentLeadStatus = l.status || 'NUEVO/ SIN CONTACTAR';
+                  const statusBgColor = 
+                    currentLeadStatus === 'NUEVO/ SIN CONTACTAR' ? 'bg-blue-950/80 border-blue-700 text-blue-300' :
+                    currentLeadStatus === 'EN SEGUIMIENTO' ? 'bg-amber-950/80 border-amber-700 text-amber-300' :
+                    currentLeadStatus === 'CITA AGENDA' ? 'bg-emerald-950/80 border-emerald-700 text-emerald-300' : 'bg-red-950/80 border-red-700 text-red-300';
+
+                  return (
+                    <div key={l.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2.5 shadow-sm">
+                      <div className="flex justify-between items-center">
+                        <select value={currentLeadStatus} onChange={(e) => handleUpdateLeadStatusInline(l.id, e.target.value)} className={`text-[10px] font-black px-2 py-1 rounded-lg border outline-none cursor-pointer uppercase ${statusBgColor}`}>
+                          {statuses.map((st) => <option key={st} value={st} className="bg-slate-950 text-white">{st}</option>)}
+                        </select>
+                        <button onClick={() => setCurrentNoteTarget({ type: 'lead', id: l.id, name: l.full_name || l.name, notes: l.notes || '' })} className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold">📝 {l.notes ? 'Ver Nota' : '+ Nota'}</button>
+                      </div>
+                      <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
+                      <p className="text-xs text-gray-400">📞 {l.phone}</p>
+                      {l.email && <p className="text-xs text-gray-400">✉️ {l.email}</p>}
+                      {l.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="flex-1 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold text-center">WhatsApp</a>
+                        <button onClick={() => handleConvertLeadToSocio(l.id)} className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold">Cliente</button>
+                        <button onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }} className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold">Agendar</button>
+                        <button onClick={() => { setEditingLead(l); setNombre(l.full_name || l.name || ''); setTelefono(l.phone || ''); setCorreo(l.email || ''); setOrigen(l.origin || 'Facebook Ads'); setLeadStatus(l.status || 'NUEVO/ SIN CONTACTAR'); setNotasLead(l.notes || ''); setIsLeadModalOpen(true); }} className="px-2 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Editar</button>
+                        <button onClick={() => handleDeleteLead(l.id)} className="px-2 py-1.5 bg-red-600/20 text-red-400 rounded-lg text-xs font-bold">✕</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex space-x-4 overflow-x-auto pb-4">
+                {statuses.map((status) => {
+                  const statusLeads = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === status);
+                  return (
+                    <div key={status} className="w-72 flex-shrink-0 bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col max-h-[70vh]">
+                      <h3 className="font-bold text-xs text-gray-300 mb-3 uppercase flex justify-between">
+                        <span>{status}</span>
+                        <span className="bg-slate-800 text-blue-400 px-1.5 rounded-full">{statusLeads.length}</span>
+                      </h3>
+                      <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+                        {statusLeads.map((lead) => (
+                          <div key={lead.id} className="bg-slate-950 p-3 rounded-lg shadow-sm border border-slate-800 space-y-1">
+                            <p className="font-bold text-xs text-white">{lead.full_name || lead.name}</p>
+                            <p className="text-[11px] text-gray-400">{lead.phone}</p>
+                            <div className="flex justify-between items-center pt-1">
+                              <a href={getWhatsAppLink(lead.phone, lead.full_name || lead.name)} target="_blank" rel="noreferrer" className="text-green-400 text-[10px] font-bold underline">WhatsApp</a>
+                              <button onClick={() => { setSelectedLeadId(lead.id); setIsCitaModalOpen(true); }} className="px-2 py-0.5 bg-blue-600 text-white text-[10px] rounded font-bold">Agendar</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB CITAS */}
+        {userProfile?.role !== 'superadmin' && currentTab === 'citas' && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-base font-bold text-white">Citas Programadas</h2>
+              <button onClick={() => { setEditingCita(null); setSelectedLeadId(''); setFechaCita(''); setHoraCita(''); setNotasCita(''); setIsCitaModalOpen(true); }} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">+ Agendar Cita</button>
+            </div>
+            {loadingCitas ? (
+              <p className="text-center text-gray-500 py-10 text-xs">Cargando citas...</p>
+            ) : equipoCitas.length === 0 ? (
+              <p className="text-center text-gray-500 py-10 text-xs">No hay citas registradas.</p>
+            ) : (
+              <div className="space-y-2">
+                {equipoCitas.map((c) => {
+                  const leadObj = c.leads;
+                  const leadName = leadObj?.full_name || leadObj?.name || 'Cliente';
+                  const leadPhone = leadObj?.phone || '';
+                  const leadId = leadObj?.id || c.lead_id;
+
+                  return (
+                    <div key={c.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-bold text-white text-sm">{leadName}</h4>
+                          <button onClick={() => setCurrentNoteTarget({ type: 'cita', id: c.id, name: leadName, notes: c.notes || '' })} className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold">📝 {c.notes ? 'Ver Nota' : '+ Nota'}</button>
+                        </div>
+                        <p className="text-xs text-amber-400 mt-0.5">📅 Fecha: {c.appointment_date} {c.appointment_time ? `• ⏰ ${c.appointment_time}` : ''}</p>
+                        {c.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {c.notes}</p>}
+                      </div>
+                      <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                        <button onClick={() => handleConvertLeadToSocio(leadId)} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition">✨ Volver Cliente</button>
+                        {leadPhone && <a href={getWhatsAppLink(leadPhone, leadName)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">WhatsApp</a>}
+                        <button onClick={() => { setEditingCita(c); setSelectedLeadId(c.lead_id || ''); setFechaCita(c.appointment_date || ''); setHoraCita(c.appointment_time || ''); setNotasCita(c.notes || ''); setIsCitaModalOpen(true); }} className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition">Editar</button>
+                        <button onClick={() => handleDeleteCita(c.id)} className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition">Eliminar</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB SOCIOS / CLIENTES */}
+        {userProfile?.role !== 'superadmin' && currentTab === 'socios' && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-base font-bold text-white">Clientes Activos ({socios.length})</h2>
+              <button onClick={() => { setEditingSocio(null); setSelectedSocioLeadId(''); setSelectedMembresiaId(membresias[0]?.id || ''); setPaymentStatus('Pagado'); setNotasSocio(''); setIsSocioModalOpen(true); }} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">+ Nuevo Cliente</button>
+            </div>
+
+            {loadingSocios ? (
+              <p className="text-center text-gray-500 py-10 text-xs">Cargando clientes...</p>
+            ) : socios.length === 0 ? (
+              <p className="text-center text-gray-500 py-10 text-xs">No hay clientes registrados.</p>
+            ) : activeSociosView === 'lista' ? (
+              <div className="space-y-2">
+                {socios.map((s) => {
+                  const socioName = s.leads?.full_name || s.leads?.name || 'Cliente';
+                  const membName = s.membresias?.nombre || 'Sin Plan';
+                  const membSecc = s.membresias?.secciones || '';
+                  const statusColor = s.payment_status === 'Pagado' ? 'text-green-400' : 'text-red-400';
+
+                  return (
+                    <div key={s.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[10px] font-black bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded uppercase">🏷️ {membName}</span>
+                          <button onClick={() => setCurrentNoteTarget({ type: 'socio', id: s.id, name: socioName, notes: s.notes || '' })} className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold">📝 {s.notes ? 'Ver Nota' : '+ Nota'}</button>
+                        </div>
+                        <h4 className="font-bold text-white text-sm">{socioName}</h4>
+                        <p className="text-xs text-gray-400">Detalles: <span className="text-blue-300">{membSecc || 'N/A'}</span> • Estado: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
+                        {s.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {s.notes}</p>}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button onClick={() => { setEditingSocio(s); setSelectedSocioLeadId(s.lead_id || ''); setSelectedMembresiaId(s.membresia_id || ''); setPaymentStatus(s.payment_status || 'Pagado'); setNotasSocio(s.notes || ''); setIsSocioModalOpen(true); }} className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition">Editar</button>
+                        <button onClick={() => handleDeleteSocio(s.id)} className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition">Eliminar</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : activeSociosView === 'tarjetas' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {socios.map((s) => {
+                  const socioName = s.leads?.full_name || s.leads?.name || 'Cliente';
+                  const membName = s.membresias?.nombre || 'Sin Plan';
+                  const membSecc = s.membresias?.secciones || '';
+                  const statusColor = s.payment_status === 'Pagado' ? 'text-green-400' : 'text-red-400';
+
+                  return (
+                    <div key={s.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2.5 shadow-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded uppercase">🏷️ {membName}</span>
+                        <button onClick={() => setCurrentNoteTarget({ type: 'socio', id: s.id, name: socioName, notes: s.notes || '' })} className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold">📝 {s.notes ? 'Ver Nota' : '+ Nota'}</button>
+                      </div>
+                      <h4 className="font-bold text-white text-sm">{socioName}</h4>
+                      <p className="text-xs text-gray-400">Detalle: {membSecc || 'N/A'}</p>
+                      <p className="text-xs text-gray-400">Pago: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
+                      {s.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {s.notes}</p>}
+                      <div className="flex space-x-2 pt-1">
+                        <button onClick={() => { setEditingSocio(s); setSelectedSocioLeadId(s.lead_id || ''); setSelectedMembresiaId(s.membresia_id || ''); setPaymentStatus(s.payment_status || 'Pagado'); setNotasSocio(s.notes || ''); setIsSocioModalOpen(true); }} className="flex-1 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Editar</button>
+                        <button onClick={() => handleDeleteSocio(s.id)} className="px-3 py-1.5 bg-red-600/20 text-red-400 rounded-lg text-xs font-bold">Eliminar</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex space-x-4 overflow-x-auto pb-4">
+                {membresias.map((m) => {
+                  const membresiaSocios = socios.filter((s) => s.membresia_id === m.id);
+                  return (
+                    <div key={m.id} className="w-72 flex-shrink-0 bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col max-h-[70vh]">
+                      <h3 className="font-bold text-xs text-blue-400 mb-1 uppercase">🏷️ {m.nombre}</h3>
+                      <p className="text-[10px] text-gray-400 mb-3">Detalle: {m.secciones || 'N/A'} • ${m.precio}</p>
+                      <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+                        {membresiaSocios.map((s) => (
+                          <div key={s.id} className="bg-slate-950 p-3 rounded-lg shadow-sm border border-slate-800 space-y-1">
+                            <p className="font-bold text-xs text-white">{s.leads?.full_name || s.leads?.name || 'Cliente'}</p>
+                            <p className="text-[11px] text-green-400">Estado: {s.payment_status}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB PLANES / MEMBRESIAS */}
+        {userProfile?.role !== 'superadmin' && currentTab === 'membresias' && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-base font-bold text-white">Planes y Membresías ({membresias.length})</h2>
+              <button onClick={() => { setEditingMembresia(null); setNombreMembresia(''); setSeccionesMembresia(''); setPrecioMembresia(''); setIsMembresiaModalOpen(true); }} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">+ Nuevo Plan</button>
+            </div>
+
+            {loadingMembresias ? (
+              <p className="text-center text-gray-500 py-10 text-xs">Cargando planes...</p>
+            ) : membresias.length === 0 ? (
+              <p className="text-center text-gray-500 py-10 text-xs">No hay planes creados.</p>
+            ) : (
+              <div className="space-y-2">
+                {membresias.map((m) => (
+                  <div key={m.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex justify-between items-center shadow-sm">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{m.nombre}</h4>
+                      <p className="text-xs text-gray-400">Detalles: <span className="text-blue-300">{m.secciones || 'General'}</span> • Precio: <span className="text-green-400 font-bold">${m.precio}</span></p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button onClick={() => { setEditingMembresia(m); setNombreMembresia(m.nombre || ''); setSeccionesMembresia(m.secciones || ''); setPrecioMembresia(m.precio ? m.precio.toString() : ''); setIsMembresiaModalOpen(true); }} className="px-2.5 py-1 bg-slate-800 text-gray-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-slate-700 transition">Editar</button>
+                      <button onClick={() => handleDeleteMembresia(m.id)} className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition">Eliminar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB METRICAS */}
+        {userProfile?.role !== 'superadmin' && currentTab === 'metricas' && (
+          <div className="space-y-5">
+            <h2 className="text-base font-bold text-white mb-2">Métricas de Conversión y Rendimiento</h2>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col items-center justify-center space-y-3 shadow-lg">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Porcentaje de Aciertos (Cierres)</h3>
+                <div className="w-28 h-28 rounded-full border-4 border-green-500 flex items-center justify-center bg-green-950/20 shadow-inner">
+                  <span className="text-2xl font-black text-green-400">{conversionRate}%</span>
+                </div>
+                <p className="text-xs text-gray-400">{socios.length} clientes de {dirige.length} leads totales</p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col items-center justify-center space-y-3 shadow-lg">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Porcentaje de Desaciertos / Pendientes</h3>
+                <div className="w-28 h-28 rounded-full border-4 border-red-500 flex items-center justify-center bg-red-950/20 shadow-inner">
+                  <span className="text-2xl font-black text-red-400">{failureRate}%</span>
+                </div>
+                <p className="text-xs text-gray-400">Prospectos sin concretar venta</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-lg">
+              <h3 className="font-bold text-sm text-white">Gráfica de Estados de Leads</h3>
+              <div className="space-y-3">
+                {statusCounts.map((item) => (
+                  <div key={item.status} className="space-y-1">
+                    <div className="flex justify-between text-xs text-gray-300">
+                      <span className="font-bold">{item.status}</span>
+                      <span className="font-mono">{item.count} leads ({item.percentage}%)</span>
+                    </div>
+                    <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                      <div className="bg-blue-600 h-full rounded-full transition-all duration-500" style={{ width: `${item.percentage}%` }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB MENSAJES */}
+        {userProfile?.role !== 'superadmin' && currentTab === 'mensajes' && (
+          <div className="space-y-4">
+            <h2 className="text-base font-bold text-white mb-2">Plantilla de WhatsApp Automática</h2>
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-lg">
+              <p className="text-xs text-gray-300">Personaliza el mensaje usando <code className="bg-slate-950 text-blue-400 px-1 py-0.5 rounded">&#123;nombre&#125;</code>.</p>
+              <textarea rows={4} value={whatsappTemplate} onChange={(e) => setWhatsappTemplate(e.target.value)} className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-600" />
+              {savedTemplateMsg && <div className="p-2 bg-green-950/40 border border-green-800 text-green-300 text-xs rounded-xl text-center">¡Plantilla guardada!</div>}
+              <button type="button" onClick={() => { setSavedTemplateMsg(true); setTimeout(() => setSavedTemplateMsg(false), 3000); }} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow">Guardar Plantilla</button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB EQUIPO / VENDEDORES */}
+        {userProfile?.role !== 'superadmin' && currentTab === 'equipo' && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-base font-bold text-white">Gestión de Vendedores y Equipo</h2>
+              <button onClick={() => { setEditingUser(null); setNuevoNombre(''); setNuevoEmail(''); setNuevoPassword(''); setNuevoRol('vendedor'); setIsUserModalOpen(true); }} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow">+ Crear Vendedor</button>
+            </div>
+            {loadingTeam ? (
+              <p className="text-center text-gray-500 py-10 text-xs">Cargando equipo...</p>
+            ) : perfilesEquipo.length === 0 ? (
+              <p className="text-center text-gray-500 py-10 text-xs">No hay usuarios registrados.</p>
+            ) : (
+              <div className="space-y-2">
+                {perfilesEquipo.map((p) => (
+                  <div key={p.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{p.full_name || 'Usuario'}</h4>
+                      <p className="text-xs text-gray-400">Rol: <span className="text-blue-400 font-bold uppercase">{p.role || 'Vendedor'}</span></p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button onClick={() => { setEditingUser(p); setNuevoNombre(p.full_name || ''); setNuevoRol(p.role || 'vendedor'); setIsUserModalOpen(true); }} className="px-2.5 py-1 bg-slate-800 text-gray-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-slate-700 transition">Editar</button>
+                      <button onClick={() => handleDeleteUser(p.id)} className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition">Eliminar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </main>
+
+      {/* FAB BOTON NUEVO LEAD */}
+      {userProfile?.role !== 'superadmin' && (
+        <button onClick={() => { setEditingLead(null); setNombre(''); setTelefono(''); setCorreo(''); setOrigen('Facebook Ads'); setLeadStatus('NUEVO/ SIN CONTACTAR'); setNotasLead(''); setIsLeadModalOpen(true); }} className="fixed right-5 bottom-20 md:bottom-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg z-30 transition transform active:scale-95">
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+        </button>
+      )}
+
+      {/* MODAL NOTAS */}
+      {currentNoteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setCurrentNoteTarget(null)}></div>
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
+            <h3 className="text-lg font-bold text-white">Notas: {currentNoteTarget.name}</h3>
+            <form onSubmit={handleSaveNote} className="space-y-3">
+              <textarea rows={4} value={currentNoteTarget.notes} onChange={e => setCurrentNoteTarget({ ...currentNoteTarget, notes: e.target.value })} className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-600" />
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setCurrentNoteTarget(null)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={savingNote} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingNote ? 'Guardando...' : 'Guardar Nota'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LEAD */}
+      {isLeadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsLeadModalOpen(false)}></div>
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
+            <h3 className="text-lg font-bold text-white">{editingLead ? 'Editar Prospecto' : 'Nuevo Prospecto'}</h3>
+            <form onSubmit={handleCreateOrUpdateLead} className="space-y-3">
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Nombre</label><input type="text" required placeholder="Ej. Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Teléfono</label><input type="text" required placeholder="Ej. 5493854123456" value={telefono} onChange={e => setTelefono(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Correo electrónico</label><input type="email" placeholder="correo@ejemplo.com" value={correo} onChange={e => setCorreo(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Origen</label><input type="text" value={origen} onChange={e => setOrigen(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Estado</label><select value={leadStatus} onChange={e => setLeadStatus(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">{statuses.map(st => <option key={st} value={st}>{st}</option>)}</select></div>
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setIsLeadModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={savingLead} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingLead ? 'Guardando...' : 'Guardar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CITA */}
+      {isCitaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsCitaModalOpen(false)}></div>
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
+            <h3 className="text-lg font-bold text-white">{editingCita ? 'Editar Cita' : 'Agendar Cita'}</h3>
+            <form onSubmit={handleCreateOrUpdateCita} className="space-y-3">
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Seleccionar Lead</label><select required disabled={!!editingCita} value={selectedLeadId} onChange={e => setSelectedLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white disabled:opacity-50"><option value="">Selecciona un Lead</option>{dirige.map(l => <option key={l.id} value={l.id}>{l.full_name || l.name} ({l.phone})</option>)}</select></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Fecha</label><input type="date" required value={fechaCita} onChange={e => setFechaCita(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Hora</label><input type="time" required value={horaCita} onChange={e => setHoraCita(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setIsCitaModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={savingCita} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingCita ? 'Guardando...' : 'Guardar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SOCIO */}
+      {isSocioModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsSocioModalOpen(false)}></div>
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
+            <h3 className="text-lg font-bold text-white">{editingSocio ? 'Editar Cliente' : 'Nuevo Cliente'}</h3>
+            <form onSubmit={handleCreateOrUpdateSocio} className="space-y-3">
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Lead</label><select required disabled={!!editingSocio} value={selectedSocioLeadId} onChange={e => setSelectedSocioLeadId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white disabled:opacity-50"><option value="">Selecciona un Lead</option>{dirige.map(l => <option key={l.id} value={l.id}>{l.full_name || l.name}</option>)}</select></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Plan</label><select required value={selectedMembresiaId} onChange={e => setSelectedMembresiaId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white"><option value="">Selecciona un Plan</option>{membresias.map(m => <option key={m.id} value={m.id}>{m.nombre} (${m.precio})</option>)}</select></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Estado de Pago</label><select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white"><option value="Pagado">Pagado</option><option value="Pendiente">Pendiente</option><option value="Pago Parcial">Pago Parcial</option></select></div>
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setIsSocioModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={savingSocio} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingSocio ? 'Guardando...' : 'Guardar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MEMBRESIA */}
+      {isMembresiaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsMembresiaModalOpen(false)}></div>
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
+            <h3 className="text-lg font-bold text-white text-center">{editingMembresia ? 'Editar Plan' : 'Nuevo Plan'}</h3>
+            <form onSubmit={handleCreateOrUpdateMembresia} className="space-y-3">
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Nombre</label><input type="text" required placeholder="Ej. Plan Full" value={nombreMembresia} onChange={e => setNombreMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Detalles</label><input type="text" placeholder="Ej. Acceso completo" value={seccionesMembresia} onChange={e => setSeccionesMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Precio</label><input type="number" required placeholder="Ej. 15000" value={precioMembresia} onChange={e => setPrecioMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setIsMembresiaModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={savingMembresia} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingMembresia ? 'Guardando...' : 'Guardar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL USUARIO */}
+      {isUserModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsUserModalOpen(false)}></div>
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
+            <h3 className="text-lg font-bold text-white">{editingUser ? 'Editar Vendedor' : 'Nuevo Vendedor'}</h3>
+            <form onSubmit={handleCreateOrUpdateUser} className="space-y-3">
+              <div><label className="block text-xs font-bold text-gray-300 mb-1">Nombre</label><input type="text" required value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+              {!editingUser && (
+                <>
+                  <div><label className="block text-xs font-bold text-gray-300 mb-1">Correo</label><input type="email" required value={nuevoEmail} onChange={e => setNuevoEmail(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+                  <div><label className="block text-xs font-bold text-gray-300 mb-1">Contraseña</label><input type="password" required value={nuevoPassword} onChange={e => setNuevoPassword(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" /></div>
+                </>
+              )}
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={savingUser} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingUser ? 'Guardando...' : 'Guardar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* NAV MOBILE */}
+      {userProfile?.role !== 'superadmin' && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around py-2 z-20 shadow-lg">
+          <button onClick={() => setCurrentTab('dirige')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'dirige' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}><span className="text-[10px]">Dirige</span></button>
+          <button onClick={() => setCurrentTab('citas')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'citas' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}><span className="text-[10px]">Citas</span></button>
+          <button onClick={() => setCurrentTab('socios')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'socios' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}><span className="text-[10px]">Clientes</span></button>
+          <button onClick={() => setCurrentTab('metricas')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'metricas' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}><span className="text-[10px]">Métricas</span></button>
+        </nav>
+      )}
 
     </div>
   );
