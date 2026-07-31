@@ -34,19 +34,27 @@ export default function CRMPage() {
   const [isSocioModalOpen, setIsSocioModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
+  // Modal para ver y editar notas de clientes
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [currentNoteTarget, setCurrentNoteTarget] = useState<{ type: 'lead' | 'cita' | 'socio', id: string, name: string, notes: string } | null>(null);
+  const [savingNote, setSavingNote] = useState(false);
+
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [correo, setCorreo] = useState('');
   const [origen, setOrigen] = useState('Facebook Ads');
+  const [notasLead, setNotasLead] = useState('');
   const [savingLead, setSavingLead] = useState(false);
 
   const [selectedLeadId, setSelectedLeadId] = useState('');
   const [fechaCita, setFechaCita] = useState('');
   const [horaCita, setHoraCita] = useState('');
+  const [notasCita, setNotasCita] = useState('');
   const [savingCita, setSavingCita] = useState(false);
 
   const [selectedSocioLeadId, setSelectedSocioLeadId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('Pagado');
+  const [notasSocio, setNotasSocio] = useState('');
   const [savingSocio, setSavingSocio] = useState(false);
 
   const [nuevoNombre, setNuevoNombre] = useState('');
@@ -134,13 +142,15 @@ export default function CRMPage() {
       full_name: nombre, 
       phone: telefono, 
       email: correo || null, 
-      origin 
+      origin,
+      notes: notasLead || null
     }]);
     setSavingLead(false);
     if (!error) {
       setNombre('');
       setTelefono('');
       setCorreo('');
+      setNotasLead('');
       setIsLeadModalOpen(false);
       fetchDirige();
     } else {
@@ -155,16 +165,21 @@ export default function CRMPage() {
       return;
     }
     setSavingCita(true);
+    const combinedDateTime = `${fechaCita}T${horaCita || '00:00'}:00`;
+    
     const { error } = await supabase.from('appointments').insert([{ 
       lead_id: selectedLeadId, 
       appointment_date: fechaCita, 
-      appointment_time: horaCita 
+      appointment_time: horaCita,
+      scheduled_at: combinedDateTime,
+      notes: notasCita || null
     }]);
     setSavingCita(false);
     if (!error) {
       setFechaCita('');
       setHoraCita('');
       setSelectedLeadId('');
+      setNotasCita('');
       setIsCitaModalOpen(false);
       fetchCitas();
       alert('Cita agendada con éxito');
@@ -180,14 +195,57 @@ export default function CRMPage() {
       return;
     }
     setSavingSocio(true);
-    const { error } = await supabase.from('socios').insert([{ lead_id: selectedSocioLeadId, payment_status: paymentStatus }]);
+    const { error } = await supabase.from('socios').insert([{ 
+      lead_id: selectedSocioLeadId, 
+      payment_status: paymentStatus,
+      notes: notasSocio || null
+    }]);
     setSavingSocio(false);
     if (!error) {
       setSelectedSocioLeadId('');
+      setNotasSocio('');
       setIsSocioModalOpen(false);
       fetchSocios();
     } else {
       alert('Error al registrar socio: ' + error.message);
+    }
+  };
+
+  const handleDeleteSocio = async (socioId: string) => {
+    if (!confirm('¿Estás seguro de eliminar este socio?')) return;
+    const { error } = await supabase.from('socios').delete().eq('id', socioId);
+    if (!error) {
+      fetchSocios();
+    } else {
+      alert('No se pudo eliminar el socio.');
+    }
+  };
+
+  // Función para actualizar notas de cualquier elemento
+  const handleSaveNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentNoteTarget) return;
+    setSavingNote(true);
+
+    const tableName = 
+      currentNoteTarget.type === 'lead' ? 'leads' :
+      currentNoteTarget.type === 'cita' ? 'appointments' : 'socios';
+
+    const { error } = await supabase
+      .from(tableName)
+      .update({ notes: currentNoteTarget.notes })
+      .eq('id', currentNoteTarget.id);
+
+    setSavingNote(false);
+    if (!error) {
+      setIsNoteModalOpen(false);
+      setCurrentNoteTarget(null);
+      if (currentNoteTarget.type === 'lead') fetchDirige();
+      if (currentNoteTarget.type === 'cita') fetchCitas();
+      if (currentNoteTarget.type === 'socio') fetchSocios();
+      alert('Nota actualizada con éxito');
+    } else {
+      alert('Error al guardar la nota: ' + error.message);
     }
   };
 
@@ -388,25 +446,20 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl z-10 space-y-5 text-gray-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🚀</span> <span>Onboarding & Novedades</span>
+                <span>🚀</span> <span>Onboarding & Notas</span>
               </h3>
               <button onClick={() => setIsOnboardingOpen(false)} className="text-gray-400 hover:text-white font-bold text-lg">✕</button>
             </div>
             
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">1. Formulario Completo de Leads</h4>
-                <p>Al agregar un lead, puedes registrar Nombre, Teléfono, Origen y Correo electrónico (opcional).</p>
+                <h4 className="font-bold text-blue-400 text-sm">1. Notas en Leads, Socios y Citas</h4>
+                <p>Ahora puedes añadir notas personalizadas en cada cliente para registrar información clave y saber más de ellos en todo momento.</p>
               </div>
 
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">2. Métricas de Rendimiento</h4>
-                <p>Visualiza gráficos circulares de porcentajes de aciertos y desaciertos basados en tus citas y cierres.</p>
-              </div>
-
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">3. Mensajes de WhatsApp Personalizados</h4>
-                <p>Configura plantillas automáticas con la etiqueta &#123;nombre&#125; para saludar a tus leads directamente.</p>
+                <h4 className="font-bold text-blue-400 text-sm">2. Control de Pagos</h4>
+                <p>Estados de pago diferenciados por colores: Pagado (verde), Pendiente (rojo) y Pago Parcial (naranja).</p>
               </div>
             </div>
 
@@ -462,17 +515,25 @@ export default function CRMPage() {
               <div className="space-y-2">
                 {dirige.map((l) => (
                   <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
-                    <div>
-                      <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
+                        <button 
+                          onClick={() => setCurrentNoteTarget({ type: 'lead', id: l.id, name: l.full_name || l.name, notes: l.notes || '' })}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
+                        >
+                          📝 {l.notes ? 'Ver Nota' : '+ Nota'}
+                        </button>
+                      </div>
                       <p className="text-xs text-gray-400">{l.phone} {l.email ? `• ${l.email}` : ''} • <span className="text-blue-400">{l.origin}</span></p>
-                      <p className="text-[10px] text-gray-500 mt-1">Registrado: {l.created_at ? new Date(l.created_at).toLocaleString() : 'N/D'}</p>
+                      {l.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
                     </div>
                     <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
                       <button 
                         onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
                         className="px-3 py-1.5 bg-blue-600/30 text-blue-400 border border-blue-600/50 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition"
                       >
-                        📅 Agendar Cita
+                        📅 Agendar
                       </button>
                       <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
                         WhatsApp
@@ -485,10 +546,18 @@ export default function CRMPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {dirige.map((l) => (
                   <div key={l.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-sm">
-                    <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
+                      <button 
+                        onClick={() => setCurrentNoteTarget({ type: 'lead', id: l.id, name: l.full_name || l.name, notes: l.notes || '' })}
+                        className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
+                      >
+                        📝 {l.notes ? 'Ver Nota' : '+ Nota'}
+                      </button>
+                    </div>
                     <p className="text-xs text-gray-400">📞 {l.phone}</p>
                     {l.email && <p className="text-xs text-gray-400">✉️ {l.email}</p>}
-                    <p className="text-[10px] text-gray-500">Registrado: {l.created_at ? new Date(l.created_at).toLocaleString() : 'N/D'}</p>
+                    {l.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
                     <div className="flex space-x-2 pt-1">
                       <button 
                         onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
@@ -541,10 +610,19 @@ export default function CRMPage() {
             ) : (
               <div className="space-y-2">
                 {equipoCitas.map((c) => (
-                  <div key={c.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center">
+                  <div key={c.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center shadow-sm">
                     <div>
-                      <h4 className="font-bold text-white text-sm">{c.leads?.full_name || c.leads?.name || 'Cliente'}</h4>
-                      <p className="text-xs text-amber-400">📅 Fecha: {c.appointment_date} {c.appointment_time ? `• ⏰ ${c.appointment_time}` : ''}</p>
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-bold text-white text-sm">{c.leads?.full_name || c.leads?.name || 'Cliente'}</h4>
+                        <button 
+                          onClick={() => setCurrentNoteTarget({ type: 'cita', id: c.id, name: c.leads?.full_name || 'Cita', notes: c.notes || '' })}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
+                        >
+                          📝 {c.notes ? 'Ver Nota' : '+ Nota'}
+                        </button>
+                      </div>
+                      <p className="text-xs text-amber-400 mt-0.5">📅 Fecha: {c.appointment_date} {c.appointment_time ? `• ⏰ ${c.appointment_time}` : ''}</p>
+                      {c.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {c.notes}</p>}
                     </div>
                     <span className="text-[10px] bg-amber-900/40 text-amber-300 border border-amber-700 px-2 py-1 rounded-lg">Agendado</span>
                   </div>
@@ -568,14 +646,35 @@ export default function CRMPage() {
               <p className="text-center text-gray-500 py-10 text-xs">No hay socios registrados.</p>
             ) : (
               <div className="space-y-2">
-                {socios.map((s) => (
-                  <div key={s.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center">
-                    <div>
-                      <h4 className="font-bold text-white text-sm">{s.leads?.full_name || s.leads?.name || 'Socio'}</h4>
-                      <p className="text-xs text-gray-400">Estado: <span className="text-green-400 font-bold">{s.payment_status}</span></p>
+                {socios.map((s) => {
+                  const statusColor = 
+                    s.payment_status === 'Pagado' ? 'text-green-400' :
+                    s.payment_status === 'Pendiente' ? 'text-red-400' : 'text-orange-400';
+                  
+                  return (
+                    <div key={s.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center shadow-sm">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-bold text-white text-sm">{s.leads?.full_name || s.leads?.name || 'Socio'}</h4>
+                          <button 
+                            onClick={() => setCurrentNoteTarget({ type: 'socio', id: s.id, name: s.leads?.full_name || 'Socio', notes: s.notes || '' })}
+                            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
+                          >
+                            📝 {s.notes ? 'Ver Nota' : '+ Nota'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">Estado: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
+                        {s.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {s.notes}</p>}
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteSocio(s.id)}
+                        className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+                      >
+                        Eliminar
+                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -700,6 +799,32 @@ export default function CRMPage() {
         </svg>
       </button>
 
+      {/* MODAL PARA AGREGAR / EDITAR NOTAS */}
+      {currentNoteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setCurrentNoteTarget(null)}></div>
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
+            <h3 className="text-lg font-bold text-white">Notas de Cliente: {currentNoteTarget.name}</h3>
+            <form onSubmit={handleSaveNote} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Apunta detalles clave sobre este cliente</label>
+                <textarea
+                  rows={4}
+                  value={currentNoteTarget.notes}
+                  onChange={e => setCurrentNoteTarget({ ...currentNoteTarget, notes: e.target.value })}
+                  placeholder="Ej. Prefiere entrenar por la mañana, le interesa musculación..."
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setCurrentNoteTarget(null)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={savingNote} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingNote ? 'Guardando...' : 'Guardar Nota'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {isLeadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsLeadModalOpen(false)}></div>
@@ -721,6 +846,10 @@ export default function CRMPage() {
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Origen</label>
                 <input type="text" value={origen} onChange={e => setOrigen(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Notas iniciales (Opcional)</label>
+                <input type="text" placeholder="Ej. Quiere empezar el lunes" value={notasLead} onChange={e => setNotasLead(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
               </div>
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setIsLeadModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
@@ -752,6 +881,10 @@ export default function CRMPage() {
                 <label className="block text-xs font-bold text-gray-300 mb-1">Hora de Cita</label>
                 <input type="time" required value={horaCita} onChange={e => setHoraCita(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
               </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Notas de Cita (Opcional)</label>
+                <input type="text" placeholder="Ej. Viene con un amigo" value={notasCita} onChange={e => setNotasCita(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setIsCitaModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
                 <button type="submit" disabled={savingCita} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingCita ? 'Agendando...' : 'Agendar'}</button>
@@ -774,7 +907,12 @@ export default function CRMPage() {
               <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
                 <option value="Pagado">Pagado</option>
                 <option value="Pendiente">Pendiente</option>
+                <option value="Pago Parcial">Pago Parcial</option>
               </select>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Notas de Socio (Opcional)</label>
+                <input type="text" placeholder="Ej. Pagó en efectivo plan anual" value={notasSocio} onChange={e => setNotasSocio(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setIsSocioModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
                 <button type="submit" disabled={savingSocio} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingSocio ? 'Guardando...' : 'Guardar'}</button>
@@ -813,7 +951,7 @@ export default function CRMPage() {
         <button onClick={() => setCurrentTab('citas')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'citas' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
           <span className="text-[10px]">Citas</span>
         </button>
-        <button onClick={() => setCurrentTab('socios')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'socios' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
+        <button onClick={() => setCurrentTab('socios</h5>')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'socios' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
           <span className="text-[10px]">Socios</span>
         </button>
         <button onClick={() => setCurrentTab('metricas')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'metricas' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
