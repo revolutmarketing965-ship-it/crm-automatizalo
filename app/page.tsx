@@ -22,6 +22,15 @@ export default function CRMPage() {
   const [socios, setSocios] = useState<any[]>([]);
   const [perfilesEquipo, setPerfilesEquipo] = useState<any[]>([]);
 
+  // Estado seleccionado para filtrar leads
+  const [selectedStatus, setSelectedStatus] = useState('NUEVO/ SIN CONTACTAR');
+  const statuses = [
+    'NUEVO/ SIN CONTACTAR',
+    'EN SEGUIMIENTO',
+    'CITA AGENDA',
+    'PERDIDO/ NO RESPONDE',
+  ];
+
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [loadingCitas, setLoadingCitas] = useState(false);
   const [loadingSocios, setLoadingSocios] = useState(false);
@@ -34,12 +43,10 @@ export default function CRMPage() {
   const [isSocioModalOpen, setIsSocioModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
-  // Estados para edición
   const [editingLead, setEditingLead] = useState<any>(null);
   const [editingCita, setEditingCita] = useState<any>(null);
   const [editingSocio, setEditingSocio] = useState<any>(null);
 
-  // Modal de notas
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [currentNoteTarget, setCurrentNoteTarget] = useState<{ type: 'lead' | 'cita' | 'socio', id: string, name: string, notes: string } | null>(null);
   const [savingNote, setSavingNote] = useState(false);
@@ -48,6 +55,7 @@ export default function CRMPage() {
   const [telefono, setTelefono] = useState('');
   const [correo, setCorreo] = useState('');
   const [origen, setOrigen] = useState('Facebook Ads');
+  const [leadStatus, setLeadStatus] = useState('NUEVO/ SIN CONTACTAR');
   const [notasLead, setNotasLead] = useState('');
   const [savingLead, setSavingLead] = useState(false);
 
@@ -150,6 +158,7 @@ export default function CRMPage() {
         phone: telefono,
         email: correo || null,
         origin,
+        status: leadStatus,
         notes: notasLead || null
       }).eq('id', editingLead.id);
 
@@ -161,6 +170,7 @@ export default function CRMPage() {
         setCorreo('');
         setNotasLead('');
         setOrigen('Facebook Ads');
+        setLeadStatus('NUEVO/ SIN CONTACTAR');
         setIsLeadModalOpen(false);
         fetchDirige();
       } else {
@@ -172,6 +182,7 @@ export default function CRMPage() {
         phone: telefono, 
         email: correo || null, 
         origin,
+        status: leadStatus,
         notes: notasLead || null
       }]);
       setSavingLead(false);
@@ -181,6 +192,7 @@ export default function CRMPage() {
         setCorreo('');
         setNotasLead('');
         setOrigen('Facebook Ads');
+        setLeadStatus('NUEVO/ SIN CONTACTAR');
         setIsLeadModalOpen(false);
         fetchDirige();
       } else {
@@ -204,19 +216,20 @@ export default function CRMPage() {
     }
     setSavingCita(true);
     
-    // Formato ISO válido para scheduled_at
     const formattedDate = fechaCita || new Date().toISOString().split('T')[0];
     const formattedTime = horaCita || '00:00';
     const isoScheduledAt = new Date(`${formattedDate}T${formattedTime}:00`).toISOString();
 
-    if (editingCita) {
-      const { error } = await supabase.from('appointments').update({
-        appointment_date: formattedDate,
-        appointment_time: formattedTime,
-        scheduled_at: isoScheduledAt,
-        notes: notasCita || null
-      }).eq('id', editingCita.id);
+    const payload = {
+      lead_id: selectedLeadId || editingCita?.lead_id,
+      appointment_date: formattedDate,
+      appointment_time: formattedTime,
+      scheduled_at: isoScheduledAt,
+      notes: notasCita || null
+    };
 
+    if (editingCita) {
+      const { error } = await supabase.from('appointments').update(payload).eq('id', editingCita.id);
       setSavingCita(false);
       if (!error) {
         setEditingCita(null);
@@ -230,13 +243,7 @@ export default function CRMPage() {
         alert('Error al actualizar cita: ' + error.message);
       }
     } else {
-      const { error } = await supabase.from('appointments').insert([{ 
-        lead_id: selectedLeadId, 
-        appointment_date: formattedDate, 
-        appointment_time: formattedTime,
-        scheduled_at: isoScheduledAt,
-        notes: notasCita || null
-      }]);
+      const { error } = await supabase.from('appointments').insert([payload]);
       setSavingCita(false);
       if (!error) {
         setFechaCita('');
@@ -370,6 +377,10 @@ export default function CRMPage() {
     const customizedMessage = whatsappTemplate.replace(/{nombre}/g, leadName || 'Cliente');
     return `https://wa.me/${phone}?text=${encodeURIComponent(customizedMessage)}`;
   };
+
+  const filteredLeads = dirige.filter(
+    (lead) => (lead.status || 'NUEVO/ SIN CONTACTAR') === selectedStatus
+  );
 
   const totalLeadsCount = dirige.length;
   const totalCitasCount = equipoCitas.length;
@@ -532,20 +543,20 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl z-10 space-y-5 text-gray-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🚀</span> <span>Onboarding & Gestión</span>
+                <span>🚀</span> <span>Onboarding & Estados</span>
               </h3>
               <button onClick={() => setIsOnboardingOpen(false)} className="text-gray-400 hover:text-white font-bold text-lg">✕</button>
             </div>
             
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">1. Edición y Eliminación Total</h4>
-                <p>Ahora puedes editar o eliminar Leads, Citas y Socios con total flexibilidad desde sus respectivos paneles.</p>
+                <h4 className="font-bold text-blue-400 text-sm">1. Estados de Leads</h4>
+                <p>Clasifica tus prospectos entre Nuevos, En Seguimiento, Cita Agendada o Perdidos para mantener un control absoluto.</p>
               </div>
 
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">2. Notas Editables</h4>
-                <p>Añade y actualiza notas directamente en cada registro para mantener la información detallada.</p>
+                <h4 className="font-bold text-blue-400 text-sm">2. Edición y Notas</h4>
+                <p>Edita cualquier registro y agrega notas personalizadas para conocer mejor a cada cliente.</p>
               </div>
             </div>
 
@@ -559,6 +570,7 @@ export default function CRMPage() {
         </div>
       )}
 
+      {/* SELECTOR DE VISTAS (EN SECCIÓN DIRIGE) */}
       {currentTab === 'dirige' && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex justify-center space-x-2 sticky top-[53px] z-10 shadow-sm">
           <button
@@ -595,6 +607,7 @@ export default function CRMPage() {
                   setTelefono(''); 
                   setCorreo(''); 
                   setOrigen('Facebook Ads'); 
+                  setLeadStatus('NUEVO/ SIN CONTACTAR'); 
                   setNotasLead(''); 
                   setIsLeadModalOpen(true); 
                 }} 
@@ -604,17 +617,44 @@ export default function CRMPage() {
               </button>
             </div>
 
+            {/* FILTRO HORIZONTAL DE ESTADOS DE LEADS */}
+            {activeView !== 'kanban' && (
+              <div className="bg-slate-900 border border-slate-800 overflow-x-auto whitespace-nowrap px-2 py-2 rounded-xl shadow-sm">
+                <div className="flex space-x-2">
+                  {statuses.map((status) => {
+                    const count = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === status).length;
+                    const isSelected = selectedStatus === status;
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => setSelectedStatus(status)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center space-x-2 ${
+                          isSelected ? 'bg-blue-900/50 text-blue-300 border border-blue-700' : 'bg-slate-800 text-gray-400'
+                        }`}
+                      >
+                        <span>{status}</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300'}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {loadingLeads ? (
               <p className="text-center text-gray-500 py-10 text-xs">Cargando prospectos...</p>
-            ) : dirige.length === 0 ? (
-              <p className="text-center text-gray-500 py-10 text-xs">No hay leads registrados.</p>
+            ) : filteredLeads.length === 0 ? (
+              <p className="text-center text-gray-500 py-10 text-xs">No hay leads en este estado.</p>
             ) : activeView === 'lista' ? (
               <div className="space-y-2">
-                {dirige.map((l) => (
+                {filteredLeads.map((l) => (
                   <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
+                        <span className="text-[10px] bg-slate-800 text-blue-300 px-2 py-0.5 rounded border border-slate-700">{l.status || 'NUEVO/ SIN CONTACTAR'}</span>
                         <button 
                           onClick={() => setCurrentNoteTarget({ type: 'lead', id: l.id, name: l.full_name || l.name, notes: l.notes || '' })}
                           className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
@@ -622,7 +662,7 @@ export default function CRMPage() {
                           📝 {l.notes ? 'Ver Nota' : '+ Nota'}
                         </button>
                       </div>
-                      <p className="text-xs text-gray-400">{l.phone} {l.email ? `• ${l.email}` : ''} • <span className="text-blue-400">{l.origin}</span></p>
+                      <p className="text-xs text-gray-400 mt-1">{l.phone} {l.email ? `• ${l.email}` : ''} • <span className="text-blue-400">{l.origin}</span></p>
                       {l.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
                     </div>
                     <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
@@ -639,6 +679,7 @@ export default function CRMPage() {
                           setTelefono(l.phone || '');
                           setCorreo(l.email || '');
                           setOrigen(l.origin || 'Facebook Ads');
+                          setLeadStatus(l.status || 'NUEVO/ SIN CONTACTAR');
                           setNotasLead(l.notes || '');
                           setIsLeadModalOpen(true);
                         }}
@@ -661,7 +702,7 @@ export default function CRMPage() {
               </div>
             ) : activeView === 'tarjetas' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {dirige.map((l) => (
+                {filteredLeads.map((l) => (
                   <div key={l.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-sm">
                     <div className="flex justify-between items-start">
                       <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
@@ -672,6 +713,7 @@ export default function CRMPage() {
                         📝 {l.notes ? 'Ver Nota' : '+ Nota'}
                       </button>
                     </div>
+                    <span className="inline-block text-[10px] bg-slate-800 text-blue-300 px-2 py-0.5 rounded border border-slate-700">{l.status || 'NUEVO/ SIN CONTACTAR'}</span>
                     <p className="text-xs text-gray-400">📞 {l.phone}</p>
                     {l.email && <p className="text-xs text-gray-400">✉️ {l.email}</p>}
                     {l.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
@@ -680,7 +722,7 @@ export default function CRMPage() {
                         onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
                         className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold"
                       >
-                        Agendar Cita
+                        Agendar
                       </button>
                       <button 
                         onClick={() => {
@@ -689,6 +731,7 @@ export default function CRMPage() {
                           setTelefono(l.phone || '');
                           setCorreo(l.email || '');
                           setOrigen(l.origin || 'Facebook Ads');
+                          setLeadStatus(l.status || 'NUEVO/ SIN CONTACTAR');
                           setNotasLead(l.notes || '');
                           setIsLeadModalOpen(true);
                         }}
@@ -707,28 +750,32 @@ export default function CRMPage() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center text-gray-300 text-xs font-bold">
-                  Vista de Columnas (Total de Leads: {dirige.length})
-                </div>
-                <div className="space-y-2">
-                  {dirige.map((l) => (
-                    <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center">
-                      <div>
-                        <h4 className="font-bold text-white text-xs">{l.full_name || l.name}</h4>
-                        <p className="text-[10px] text-gray-400">{l.phone}</p>
-                      </div>
-                      <div className="space-x-1">
-                        <button onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }} className="px-2 py-1 bg-blue-600 text-white text-[10px] rounded font-bold">
-                          Agendar
-                        </button>
-                        <button onClick={() => handleDeleteLead(l.id)} className="px-2 py-1 bg-red-600/30 text-red-300 text-[10px] rounded font-bold">
-                          Borrar
-                        </button>
+              /* VISTA KANBAN DE COLUMNAS POR ESTADO */
+              <div className="flex space-x-4 overflow-x-auto pb-4">
+                {statuses.map((status) => {
+                  const statusLeads = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === status);
+                  return (
+                    <div key={status} className="w-72 flex-shrink-0 bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col max-h-[70vh]">
+                      <h3 className="font-bold text-xs text-gray-300 mb-3 uppercase flex justify-between">
+                        <span>{status}</span>
+                        <span className="bg-slate-800 text-blue-400 px-1.5 rounded-full">{statusLeads.length}</span>
+                      </h3>
+                      <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+                        {statusLeads.map((lead) => (
+                          <div key={lead.id} className="bg-slate-950 p-3 rounded-lg shadow-sm border border-slate-800 space-y-1">
+                            <p className="font-bold text-xs text-white">{lead.full_name || lead.name}</p>
+                            <p className="text-[11px] text-gray-400">{lead.phone}</p>
+                            <div className="flex justify-end space-x-1 pt-1">
+                              <button onClick={() => { setSelectedLeadId(lead.id); setIsCitaModalOpen(true); }} className="px-2 py-0.5 bg-blue-600 text-white text-[10px] rounded font-bold">
+                                Agendar
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -989,6 +1036,7 @@ export default function CRMPage() {
           setTelefono(''); 
           setCorreo(''); 
           setOrigen('Facebook Ads'); 
+          setLeadStatus('NUEVO/ SIN CONTACTAR'); 
           setNotasLead(''); 
           setIsLeadModalOpen(true); 
         }} 
@@ -999,7 +1047,7 @@ export default function CRMPage() {
         </svg>
       </button>
 
-      {/* MODAL PARA AGREGAR / EDITAR NOTAS */}
+      {/* MODAL NOTAS */}
       {currentNoteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setCurrentNoteTarget(null)}></div>
@@ -1047,6 +1095,12 @@ export default function CRMPage() {
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Origen</label>
                 <input type="text" value={origen} onChange={e => setOrigen(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Estado del Lead</label>
+                <select value={leadStatus} onChange={e => setLeadStatus(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
+                  {statuses.map(st => <option key={st} value={st}>{st}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Notas iniciales (Opcional)</label>
