@@ -86,7 +86,7 @@ export default function CRMPage() {
   const [savingUser, setSavingUser] = useState(false);
 
   const [whatsappTemplate, setWhatsappTemplate] = useState(
-    'Hola {nombre}, te recordamos que tienes una cita agendada en nuestro gimnasio. ¡Te esperamos!'
+    'Hola {nombre}, te recordamos que tienes una cita agendada con nosotros. ¡Te esperamos!'
   );
   const [savedTemplateMsg, setSavedTemplateMsg] = useState(false);
 
@@ -299,13 +299,13 @@ export default function CRMPage() {
       lead_id: leadId,
       membresia_id: defaultMembresiaId,
       payment_status: 'Pagado',
-      notes: 'Convertido directamente desde sistema'
+      notes: 'Convertido directamente desde CRM'
     }]);
     if (!error) {
       await supabase.from('leads').update({ status: 'CITA AGENDA' }).eq('id', leadId);
       fetchSocios();
       fetchDirige();
-      alert('¡Socio registrado con éxito!');
+      alert('¡Socio registrado con éxito en el CRM!');
     } else {
       alert('Error al registrar socio: ' + error.message);
     }
@@ -505,7 +505,7 @@ export default function CRMPage() {
   if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950 text-white">
-        <p className="text-sm">Cargando aplicación...</p>
+        <p className="text-sm">Cargando CRM...</p>
       </div>
     );
   }
@@ -515,12 +515,14 @@ export default function CRMPage() {
       <div className="flex flex-col h-screen items-center justify-center bg-slate-950 text-gray-100 p-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-6">
           <div className="flex flex-col items-center space-y-3">
-            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg text-white font-black text-2xl">
-              A
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Automatízalo CRM" 
+              className="w-14 h-14 object-contain rounded-xl shadow-lg bg-slate-950 p-1" 
+            />
             <div className="text-center">
-              <h1 className="text-lg font-bold text-white tracking-tight">CRM AUTOMATIZALO GYM</h1>
-              <p className="text-xs text-gray-400 mt-0.5">Inicia sesión para continuar</p>
+              <h1 className="text-lg font-bold text-white tracking-tight">AUTOMATÍZALO CRM</h1>
+              <p className="text-xs text-gray-400 mt-0.5">Inicia sesión en tu CRM</p>
             </div>
           </div>
 
@@ -567,7 +569,8 @@ export default function CRMPage() {
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-gray-100 font-sans pb-16 md:pb-0">
       
-      <header className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-md">
+      {/* HEADER CON LOGO LIMPIO Y TEXTO CRM */}
+      <header className="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between sticky top-0 z-20 shadow-md">
         <div className="flex items-center space-x-3">
           <button 
             onClick={() => setIsSidebarOpen(true)} 
@@ -577,11 +580,13 @@ export default function CRMPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white text-xs shadow">
-              A
-            </div>
-            <span className="font-bold text-base tracking-tight text-white">CRM GYM</span>
+          <div className="flex items-center space-x-2.5">
+            <img 
+              src="/logo.png" 
+              alt="Logo CRM" 
+              className="w-8 h-8 object-contain rounded-lg bg-slate-950 p-0.5 border border-slate-800" 
+            />
+            <span className="font-bold text-sm tracking-tight text-white">AUTOMATÍZALO CRM</span>
           </div>
         </div>
 
@@ -590,7 +595,7 @@ export default function CRMPage() {
             onClick={() => setIsOnboardingOpen(true)}
             className="px-3 py-1.5 bg-blue-600/30 text-blue-400 border border-blue-600/50 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition flex items-center space-x-1"
           >
-            <span>🚀 Onboarding</span>
+            <span>🚀 Guía CRM</span>
           </button>
           <button 
             onClick={handleLogout}
@@ -601,6 +606,7 @@ export default function CRMPage() {
         </div>
       </header>
 
+      {/* MENÚ DESPLEGABLE (SIDEBAR) CON LOGO Y TEXTO CRM */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div 
@@ -609,13 +615,15 @@ export default function CRMPage() {
           ></div>
 
           <div className="relative w-80 bg-slate-900 h-full shadow-2xl flex flex-col z-10 border-r border-slate-800">
-            <div className="p-5 border-b border-slate-800 flex items-center space-x-3 bg-blue-900 text-white">
-              <div className="w-10 h-10 bg-white text-blue-900 rounded-full flex items-center justify-center font-bold text-lg shadow">
-                A
-              </div>
+            <div className="p-5 border-b border-slate-800 flex items-center space-x-3 bg-slate-950 text-white">
+              <img 
+                src="/logo.png" 
+                alt="Logo Sidebar" 
+                className="w-10 h-10 object-contain rounded-xl bg-slate-900 p-1 border border-slate-800 shadow" 
+              />
               <div>
-                <h2 className="font-bold text-base leading-tight">CRM AUTOMATIZALO</h2>
-                <span className="text-xs text-blue-300">Panel Administrativo</span>
+                <h2 className="font-bold text-sm leading-tight text-white">AUTOMATÍZALO</h2>
+                <span className="text-[11px] text-blue-400 font-medium">CRM Comercial</span>
               </div>
             </div>
 
@@ -630,19 +638,19 @@ export default function CRMPage() {
                 <span className="mr-3">📅</span> Citas y Agendamientos
               </button>
               <button onClick={() => { setCurrentTab('socios'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
-                <span className="mr-3">👥</span> Socios (Compradores)
+                <span className="mr-3">👥</span> Clientes (Compradores)
               </button>
               <button onClick={() => { setCurrentTab('membresias'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
-                <span className="mr-3">🏷️</span> Membresías y Secciones
+                <span className="mr-3">🏷️</span> Planes y Membresías
               </button>
               <button onClick={() => { setCurrentTab('metricas'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
-                <span className="mr-3">📊</span> Métricas y Aciertos
+                <span className="mr-3">📊</span> Métricas y Conversión
               </button>
               <button onClick={() => { setCurrentTab('mensajes'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
                 <span className="mr-3">💬</span> Mensajes Automáticos
               </button>
               <button onClick={() => { setCurrentTab('equipo'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
-                <span className="mr-3">⚙️</span> Equipo / Usuarios
+                <span className="mr-3">⚙️</span> Equipo / Vendedores
               </button>
             </div>
 
@@ -660,19 +668,19 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl z-10 space-y-5 text-gray-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🚀</span> <span>Membresías y Socios</span>
+                <span>🚀</span> <span>CRM Automatízalo</span>
               </h3>
               <button onClick={() => setIsOnboardingOpen(false)} className="text-gray-400 hover:text-white font-bold text-lg">✕</button>
             </div>
             
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">1. Creación de Membresías</h4>
-                <p>Configura planes, precios y secciones personalizadas en la nueva sección de Membresías del menú lateral.</p>
+                <h4 className="font-bold text-blue-400 text-sm">1. Gestión de Leads y Embudo</h4>
+                <p>Administra tus prospectos en la sección Dirige, actualiza sus estados en tiempo real y realiza anotaciones personalizadas.</p>
               </div>
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">2. Vistas Múltiples en Socios</h4>
-                <p>Explora tu cartera de socios con vistas en Lista, Tarjetas o Columnas (Kanban) con acceso a tarjetas editables.</p>
+                <h4 className="font-bold text-blue-400 text-sm">2. Planes y Clientes</h4>
+                <p>Crea membresías personalizadas y convierte tus leads calificados en clientes activos fácilmente.</p>
               </div>
             </div>
 
@@ -798,7 +806,7 @@ export default function CRMPage() {
                           onClick={() => handleConvertLeadToSocio(l.id)}
                           className="px-3 py-1.5 bg-emerald-600/30 text-emerald-400 border border-emerald-600/50 rounded-lg text-xs font-bold hover:bg-emerald-600 hover:text-white transition"
                         >
-                          ✨ Socio
+                          ✨ Cliente
                         </button>
                         <button 
                           onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
@@ -877,7 +885,7 @@ export default function CRMPage() {
                           onClick={() => handleConvertLeadToSocio(l.id)}
                           className="flex-1 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold"
                         >
-                          Socio
+                          Cliente
                         </button>
                         <button 
                           onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
@@ -993,7 +1001,7 @@ export default function CRMPage() {
                           onClick={() => handleConvertLeadToSocio(leadId)}
                           className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
                         >
-                          ✨ Volver Socio
+                          ✨ Volver Cliente
                         </button>
                         {leadPhone && (
                           <a href={getWhatsAppLink(leadPhone, leadName)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
@@ -1031,7 +1039,7 @@ export default function CRMPage() {
         {currentTab === 'socios' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
-              <h2 className="text-base font-bold text-white">Socios Activos ({socios.length})</h2>
+              <h2 className="text-base font-bold text-white">Clientes Activos ({socios.length})</h2>
               <button 
                 onClick={() => { 
                   setEditingSocio(null); 
@@ -1043,19 +1051,19 @@ export default function CRMPage() {
                 }} 
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow"
               >
-                + Nuevo Socio
+                + Nuevo Cliente
               </button>
             </div>
 
             {loadingSocios ? (
-              <p className="text-center text-gray-500 py-10 text-xs">Cargando socios...</p>
+              <p className="text-center text-gray-500 py-10 text-xs">Cargando clientes...</p>
             ) : socios.length === 0 ? (
-              <p className="text-center text-gray-500 py-10 text-xs">No hay socios registrados.</p>
+              <p className="text-center text-gray-500 py-10 text-xs">No hay clientes registrados.</p>
             ) : activeSociosView === 'lista' ? (
               <div className="space-y-2">
                 {socios.map((s) => {
-                  const socioName = s.leads?.full_name || s.leads?.name || 'Socio';
-                  const membName = s.membresias?.nombre || 'Sin Membresía';
+                  const socioName = s.leads?.full_name || s.leads?.name || 'Cliente';
+                  const membName = s.membresias?.nombre || 'Sin Plan';
                   const membSecc = s.membresias?.secciones || '';
                   const statusColor = s.payment_status === 'Pagado' ? 'text-green-400' : 'text-red-400';
 
@@ -1072,7 +1080,7 @@ export default function CRMPage() {
                           </button>
                         </div>
                         <h4 className="font-bold text-white text-sm">{socioName}</h4>
-                        <p className="text-xs text-gray-400">Secciones: <span className="text-blue-300">{membSecc || 'N/A'}</span> • Estado: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
+                        <p className="text-xs text-gray-400">Detalles: <span className="text-blue-300">{membSecc || 'N/A'}</span> • Estado: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
                         {s.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {s.notes}</p>}
                       </div>
                       <div className="flex items-center space-x-2">
@@ -1103,8 +1111,8 @@ export default function CRMPage() {
             ) : activeSociosView === 'tarjetas' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {socios.map((s) => {
-                  const socioName = s.leads?.full_name || s.leads?.name || 'Socio';
-                  const membName = s.membresias?.nombre || 'Sin Membresía';
+                  const socioName = s.leads?.full_name || s.leads?.name || 'Cliente';
+                  const membName = s.membresias?.nombre || 'Sin Plan';
                   const membSecc = s.membresias?.secciones || '';
                   const statusColor = s.payment_status === 'Pagado' ? 'text-green-400' : 'text-red-400';
 
@@ -1120,7 +1128,7 @@ export default function CRMPage() {
                         </button>
                       </div>
                       <h4 className="font-bold text-white text-sm">{socioName}</h4>
-                      <p className="text-xs text-gray-400">Secciones: {membSecc || 'N/A'}</p>
+                      <p className="text-xs text-gray-400">Detalle: {membSecc || 'N/A'}</p>
                       <p className="text-xs text-gray-400">Pago: <span className={`font-bold ${statusColor}`}>{s.payment_status}</span></p>
                       {s.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {s.notes}</p>}
                       <div className="flex space-x-2 pt-1">
@@ -1155,11 +1163,11 @@ export default function CRMPage() {
                   return (
                     <div key={m.id} className="w-72 flex-shrink-0 bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col max-h-[70vh]">
                       <h3 className="font-bold text-xs text-blue-400 mb-1 uppercase">🏷️ {m.nombre}</h3>
-                      <p className="text-[10px] text-gray-400 mb-3">Secciones: {m.secciones || 'N/A'} • ${m.precio}</p>
+                      <p className="text-[10px] text-gray-400 mb-3">Detalle: {m.secciones || 'N/A'} • ${m.precio}</p>
                       <div className="space-y-2 overflow-y-auto flex-1 pr-1">
                         {membresiaSocios.map((s) => (
                           <div key={s.id} className="bg-slate-950 p-3 rounded-lg shadow-sm border border-slate-800 space-y-1">
-                            <p className="font-bold text-xs text-white">{s.leads?.full_name || s.leads?.name || 'Socio'}</p>
+                            <p className="font-bold text-xs text-white">{s.leads?.full_name || s.leads?.name || 'Cliente'}</p>
                             <p className="text-[11px] text-green-400">Estado: {s.payment_status}</p>
                           </div>
                         ))}
@@ -1175,7 +1183,7 @@ export default function CRMPage() {
         {currentTab === 'membresias' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
-              <h2 className="text-base font-bold text-white">Membresías y Secciones ({membresias.length})</h2>
+              <h2 className="text-base font-bold text-white">Planes y Membresías ({membresias.length})</h2>
               <button 
                 onClick={() => {
                   setEditingMembresia(null);
@@ -1186,21 +1194,21 @@ export default function CRMPage() {
                 }} 
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow"
               >
-                + Nueva Membresía
+                + Nuevo Plan
               </button>
             </div>
 
             {loadingMembresias ? (
-              <p className="text-center text-gray-500 py-10 text-xs">Cargando membresías...</p>
+              <p className="text-center text-gray-500 py-10 text-xs">Cargando planes...</p>
             ) : membresias.length === 0 ? (
-              <p className="text-center text-gray-500 py-10 text-xs">No hay membresías creadas.</p>
+              <p className="text-center text-gray-500 py-10 text-xs">No hay planes creados.</p>
             ) : (
               <div className="space-y-2">
                 {membresias.map((m) => (
                   <div key={m.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex justify-between items-center shadow-sm">
                     <div>
                       <h4 className="font-bold text-white text-sm">{m.nombre}</h4>
-                      <p className="text-xs text-gray-400">Secciones: <span className="text-blue-300">{m.secciones || 'General'}</span> • Precio: <span className="text-green-400 font-bold">${m.precio}</span></p>
+                      <p className="text-xs text-gray-400">Detalles: <span className="text-blue-300">{m.secciones || 'General'}</span> • Precio: <span className="text-green-400 font-bold">${m.precio}</span></p>
                     </div>
                     <div className="flex space-x-2">
                       <button 
@@ -1239,7 +1247,7 @@ export default function CRMPage() {
                 <div className="w-28 h-28 rounded-full border-4 border-green-500 flex items-center justify-center bg-green-950/20 shadow-inner">
                   <span className="text-2xl font-black text-green-400">{conversionRate}%</span>
                 </div>
-                <p className="text-xs text-gray-400">{socios.length} socios de {dirige.length} leads totales</p>
+                <p className="text-xs text-gray-400">{socios.length} clientes de {dirige.length} leads totales</p>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col items-center justify-center space-y-3 shadow-lg">
@@ -1247,7 +1255,7 @@ export default function CRMPage() {
                 <div className="w-28 h-28 rounded-full border-4 border-red-500 flex items-center justify-center bg-red-950/20 shadow-inner">
                   <span className="text-2xl font-black text-red-400">{failureRate}%</span>
                 </div>
-                <p className="text-xs text-gray-400">Prospectos sin concretar membresía</p>
+                <p className="text-xs text-gray-400">Prospectos sin concretar venta</p>
               </div>
             </div>
 
@@ -1282,7 +1290,7 @@ export default function CRMPage() {
                 <span className="font-bold text-amber-400">{totalCitasCount}</span>
               </div>
               <div className="flex justify-between text-xs text-gray-300 py-1.5">
-                <span>Total Socios Cerrados:</span>
+                <span>Total Clientes Cerrados:</span>
                 <span className="font-bold text-green-400">{totalSociosCount}</span>
               </div>
             </div>
@@ -1413,7 +1421,7 @@ export default function CRMPage() {
                   rows={4}
                   value={currentNoteTarget.notes}
                   onChange={e => setCurrentNoteTarget({ ...currentNoteTarget, notes: e.target.value })}
-                  placeholder="Ej. Prefiere entrenar por la mañana..."
+                  placeholder="Ej. Prefiere contactarse por la mañana..."
                   className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
                 />
               </div>
@@ -1492,7 +1500,7 @@ export default function CRMPage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Notas de Cita (Opcional)</label>
-                <input type="text" placeholder="Ej. Viene con un amigo" value={notasCita} onChange={e => setNotasCita(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                <input type="text" placeholder="Ej. Viene con un socio" value={notasCita} onChange={e => setNotasCita(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
               </div>
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setIsCitaModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
@@ -1508,7 +1516,7 @@ export default function CRMPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsSocioModalOpen(false)}></div>
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
-            <h3 className="text-lg font-bold text-white">{editingSocio ? 'Editar Socio' : 'Nuevo Socio'}</h3>
+            <h3 className="text-lg font-bold text-white">{editingSocio ? 'Editar Cliente' : 'Nuevo Cliente'}</h3>
             <form onSubmit={handleCreateOrUpdateSocio} className="space-y-3">
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Seleccionar Lead</label>
@@ -1518,9 +1526,9 @@ export default function CRMPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-300 mb-1">Tipo de Membresía</label>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Tipo de Plan</label>
                 <select required value={selectedMembresiaId} onChange={e => setSelectedMembresiaId(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white">
-                  <option value="">Selecciona una Membresía</option>
+                  <option value="">Selecciona un Plan</option>
                   {membresias.map(m => <option key={m.id} value={m.id}>{m.nombre} (${m.precio})</option>)}
                 </select>
               </div>
@@ -1533,7 +1541,7 @@ export default function CRMPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-300 mb-1">Notas de Socio (Opcional)</label>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Notas de Cliente (Opcional)</label>
                 <input type="text" placeholder="Ej. Pagó en efectivo plan anual" value={notasSocio} onChange={e => setNotasSocio(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
               </div>
               <div className="flex space-x-2 pt-2">
@@ -1550,15 +1558,15 @@ export default function CRMPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setIsMembresiaModalOpen(false)}></div>
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
-            <h3 className="text-lg font-bold text-white">{editingMembresia ? 'Editar Membresía' : 'Nueva Membresía'}</h3>
+            <h3 className="text-lg font-bold text-white">{editingMembresia ? 'Editar Plan' : 'Nuevo Plan'}</h3>
             <form onSubmit={handleCreateOrUpdateMembresia} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-gray-300 mb-1">Nombre de la Membresía</label>
-                <input type="text" required placeholder="Ej. Plan Musculación Full" value={nombreMembresia} onChange={e => setNombreMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                <label className="block text-xs font-bold text-gray-300 mb-1">Nombre del Plan</label>
+                <input type="text" required placeholder="Ej. Plan Full" value={nombreMembresia} onChange={e => setNombreMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-300 mb-1">Secciones (Ej. Musculación, Cardio, Pileta)</label>
-                <input type="text" placeholder="Ej. Zona Pesas y Cardio" value={seccionesMembresia} onChange={e => setSeccionesMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                <label className="block text-xs font-bold text-gray-300 mb-1">Detalles / Secciones</label>
+                <input type="text" placeholder="Ej. Acceso completo y automatización" value={seccionesMembresia} onChange={e => setSeccionesMembresia(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Precio</label>
@@ -1620,7 +1628,7 @@ export default function CRMPage() {
           <span className="text-[10px]">Citas</span>
         </button>
         <button onClick={() => setCurrentTab('socios')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'socios' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
-          <span className="text-[10px]">Socios</span>
+          <span className="text-[10px]">Clientes</span>
         </button>
         <button onClick={() => setCurrentTab('metricas')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'metricas' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
           <span className="text-[10px]">Métricas</span>
