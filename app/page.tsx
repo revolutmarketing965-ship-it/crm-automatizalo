@@ -26,14 +26,16 @@ export default function CRMPage() {
   const [perfilesEquipo, setPerfilesEquipo] = useState<any[]>([]);
   
   const [empresas, setEmpresas] = useState<any[]>([]);
+  
+  // Campos para CREAR negocio nuevo
   const [nuevaEmpresaNombre, setNuevaEmpresaNombre] = useState('');
   const [adminEmpresaEmail, setAdminEmpresaEmail] = useState('');
   const [adminEmpresaPass, setAdminEmpresaPass] = useState('');
   const [adminEmpresaNombre, setAdminEmpresaNombre] = useState('');
   const [savingEmpresa, setSavingEmpresa] = useState(false);
-  const [editingEmpresa, setEditingEmpresa] = useState<any>(null);
 
-  // Campos dinámicos para edición de empresa
+  // Campos para EDITAR negocio existente
+  const [editingEmpresa, setEditingEmpresa] = useState<any>(null);
   const [editNombre, setEditNombre] = useState('');
   const [editTelefono, setEditTelefono] = useState('');
   const [editDireccion, setEditDireccion] = useState('');
@@ -241,6 +243,23 @@ export default function CRMPage() {
     }
   }, [session, userProfile]);
 
+  // Función para manejar la subida de imagen desde la PC (convirtiendo a Base64)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isSuperEdit: boolean = false) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        if (isSuperEdit) {
+          setEditLogoUrl(base64String);
+        } else {
+          setNuevoLogoUrl(base64String);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleUpdateLogoEmpresa = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userProfile?.empresa_id) return;
@@ -265,7 +284,7 @@ export default function CRMPage() {
 
     const { data: empData, error: empError } = await supabase
       .from('empresas')
-      .insert([{ nombre: nuevaEmpresaNombre }])
+      .insert([{ nombre: nuevaEmpresaNombre, logo_url: nuevoLogoUrl }])
       .select()
       .single();
 
@@ -294,6 +313,7 @@ export default function CRMPage() {
       setAdminEmpresaEmail('');
       setAdminEmpresaPass('');
       setAdminEmpresaNombre('');
+      setNuevoLogoUrl('');
       fetchEmpresas();
     } else {
       alert('Empresa creada, pero error al crear usuario admin: ' + signUpError.message);
@@ -852,10 +872,10 @@ export default function CRMPage() {
         {/* PANEL CONFIGURACIÓN LOGO */}
         {userProfile?.role !== 'superadmin' && currentTab === 'configuracion' && (
           <div className="space-y-4">
-            <h2 className="text-base font-bold text-white mb-2">Configuración de Identidad y Logo</h2>
+            <h2 className="text-base font-bold text-white mb-2">Configuración de Logotipo (Automatízalo)</h2>
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-lg">
               <p className="text-xs text-gray-300">
-                Cambia el enlace de tu logotipo corporativo para actualizarlo de forma dinámica en todo tu CRM.
+                Sube una imagen directamente desde tu PC para establecer el logo oficial que se mostrará en todo el CRM.
               </p>
               
               <div className="flex items-center space-x-4 py-3">
@@ -863,21 +883,19 @@ export default function CRMPage() {
                   <img src={activeLogoSrc} alt="Logo Actual" className="w-full h-full object-contain rounded-full" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-white">Vista previa del logo actual</p>
-                  <p className="text-[10px] text-gray-400">Se adapta de manera circular corporativa</p>
+                  <p className="text-xs font-bold text-white">Vista previa del logotipo activo</p>
+                  <p className="text-[10px] text-gray-400">Formato circular optimizado</p>
                 </div>
               </div>
 
               <form onSubmit={handleUpdateLogoEmpresa} className="space-y-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1">URL de la Imagen del Logo</label>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">Seleccionar Logo desde la PC</label>
                   <input 
-                    type="url" 
-                    required 
-                    placeholder="https://ejemplo.com/tu-logo.png" 
-                    value={nuevoLogoUrl} 
-                    onChange={e => setNuevoLogoUrl(e.target.value)} 
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(e, false)} 
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" 
                   />
                 </div>
                 <button 
@@ -885,7 +903,7 @@ export default function CRMPage() {
                   disabled={savingLogo} 
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow"
                 >
-                  {savingLogo ? 'Guardando Logo...' : 'Actualizar Logo en el CRM'}
+                  {savingLogo ? 'Guardando Logo...' : 'Aplicar Logo en la Aplicación'}
                 </button>
               </form>
             </div>
@@ -896,13 +914,12 @@ export default function CRMPage() {
         {userProfile?.role === 'superadmin' && (
           <div className="space-y-6">
             
-            {/* FORMULARIO EDITAR O CREAR NEGOCIO */}
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
-              <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🏢</span> <span>{editingEmpresa ? 'Editar Negocio Dinámico' : 'Crear Nuevo Negocio'}</span>
-              </h2>
-
-              {editingEmpresa ? (
+            {/* PANEL DE EDICIÓN O CREACIÓN */}
+            {editingEmpresa ? (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 border-blue-500/50">
+                <h2 className="text-lg font-bold text-white flex items-center space-x-2">
+                  <span>✏️</span> <span>Editar Negocio: {editingEmpresa.nombre}</span>
+                </h2>
                 <form onSubmit={handleUpdateEmpresaMaster} className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-300 mb-1">Nombre del Negocio</label>
@@ -917,8 +934,8 @@ export default function CRMPage() {
                     <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={editDireccion} onChange={e => setEditDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-300 mb-1">URL del Logotipo</label>
-                    <input type="url" placeholder="https://ejemplo.com/logo.png" value={editLogoUrl} onChange={e => setEditLogoUrl(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Cargar Logotipo desde la PC</label>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, true)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white" />
                   </div>
                   <div className="flex space-x-2 pt-2">
                     <button type="button" onClick={() => setEditingEmpresa(null)} className="flex-1 py-2.5 bg-slate-800 text-gray-300 rounded-xl text-xs font-bold">Cancelar</button>
@@ -927,11 +944,16 @@ export default function CRMPage() {
                     </button>
                   </div>
                 </form>
-              ) : (
+              </div>
+            ) : (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
+                <h2 className="text-lg font-bold text-white flex items-center space-x-2">
+                  <span>🏢</span> <span>Crear Nuevo Negocio (Gimnasio / Local)</span>
+                </h2>
                 <form onSubmit={handleCreateEmpresaMaster} className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-300 mb-1">Nombre del Negocio</label>
-                    <input type="text" required placeholder="Ej. Gimnasio Titan / Mard's" value={nuevaEmpresaNombre} onChange={e => setNuevaEmpresaNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                    <input type="text" required placeholder="Ej. Gimnasio Titan / Mard's Comida" value={nuevaEmpresaNombre} onChange={e => setNuevaEmpresaNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -947,12 +969,16 @@ export default function CRMPage() {
                     <label className="block text-xs font-bold text-gray-300 mb-1">Contraseña del Administrador</label>
                     <input type="password" required placeholder="••••••••" value={adminEmpresaPass} onChange={e => setAdminEmpresaPass(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Logotipo Inicial (Desde PC)</label>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, false)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white" />
+                  </div>
                   <button type="submit" disabled={savingEmpresa} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow">
-                    {savingEmpresa ? 'Creando Empresa...' : 'Registrar Negocio y Cuenta Admin'}
+                    {savingEmpresa ? 'Creando Empresa...' : 'Registrar Negocio y Crear Cuenta Admin'}
                   </button>
                 </form>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* LISTA DE NEGOCIOS REGISTRADOS */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
