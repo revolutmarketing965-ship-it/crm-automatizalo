@@ -15,7 +15,7 @@ export default function CRMPage() {
   const [loginError, setLoginError] = useState('');
 
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [currentTab, setCurrentTab] = useState<'dirige' | 'citas' | 'socios' | 'membresias' | 'equipo' | 'metricas' | 'mensajes' | 'superadmin' | 'configuracion'>('dirige');
+  const [currentTab, setCurrentTab] = useState<'dirige' | 'citas' | 'socios' | 'membresias' | 'equipo' | 'metricas' | 'mensajes' | 'superadmin' | 'configGlobal' | 'superadminLeads'>('dirige');
   const [activeView, setActiveView] = useState<'lista' | 'tarjetas' | 'kanban'>('lista');
   const [activeSociosView, setActiveSociosView] = useState<'lista' | 'tarjetas' | 'kanban'>('lista');
 
@@ -26,12 +26,17 @@ export default function CRMPage() {
   const [perfilesEquipo, setPerfilesEquipo] = useState<any[]>([]);
   
   const [empresas, setEmpresas] = useState<any[]>([]);
+  const [allLeadsSuperadmin, setAllLeadsSuperadmin] = useState<any[]>([]);
+  const [selectedEmpresaLeadsId, setSelectedEmpresaLeadsId] = useState<string>('todos');
   
-  // Campos para CREAR negocio nuevo
+  // Campos unificados para CREAR negocio nuevo
   const [nuevaEmpresaNombre, setNuevaEmpresaNombre] = useState('');
   const [adminEmpresaEmail, setAdminEmpresaEmail] = useState('');
   const [adminEmpresaPass, setAdminEmpresaPass] = useState('');
   const [adminEmpresaNombre, setAdminEmpresaNombre] = useState('');
+  const [nuevoTelefono, setNuevoTelefono] = useState('');
+  const [nuevaDireccion, setNuevaDireccion] = useState('');
+  const [nuevoLogoUrl, setNuevoLogoUrl] = useState('');
   const [savingEmpresa, setSavingEmpresa] = useState(false);
 
   // Campos para EDITAR negocio existente
@@ -42,8 +47,10 @@ export default function CRMPage() {
   const [editLogoUrl, setEditLogoUrl] = useState('');
 
   const [empresaActualLogo, setEmpresaActualLogo] = useState('');
-  const [nuevoLogoUrl, setNuevoLogoUrl] = useState('');
   const [savingLogo, setSavingLogo] = useState(false);
+
+  // Logo global del sistema controlado por Superadmin
+  const [globalLogo, setGlobalLogo] = useState('');
 
   const statuses = [
     'NUEVO/ SIN CONTACTAR',
@@ -137,6 +144,8 @@ export default function CRMPage() {
       if (data.role === 'superadmin') {
         setCurrentTab('superadmin');
         fetchEmpresas();
+        fetchGlobalLogo();
+        fetchAllLeadsForSuperadmin();
       } else if (data.empresa_id) {
         fetchEmpresaLogo(data.empresa_id);
       }
@@ -144,17 +153,31 @@ export default function CRMPage() {
     setAuthLoading(false);
   };
 
+  const fetchGlobalLogo = async () => {
+    const savedGlobal = localStorage.getItem('global_app_logo');
+    if (savedGlobal) setGlobalLogo(savedGlobal);
+  };
+
   const fetchEmpresaLogo = async (empresaId: string) => {
+    const savedGlobal = localStorage.getItem('global_app_logo');
+    if (savedGlobal) {
+      setEmpresaActualLogo(savedGlobal);
+      return;
+    }
     const { data } = await supabase.from('empresas').select('logo_url').eq('id', empresaId).single();
     if (data && data.logo_url) {
       setEmpresaActualLogo(data.logo_url);
-      setNuevoLogoUrl(data.logo_url);
     }
   };
 
   const fetchEmpresas = async () => {
     const { data } = await supabase.from('empresas').select('*');
     if (data) setEmpresas(data);
+  };
+
+  const fetchAllLeadsForSuperadmin = async () => {
+    const { data } = await supabase.from('leads').select('*, empresas(nombre)');
+    if (data) setAllLeadsSuperadmin(data);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -243,17 +266,18 @@ export default function CRMPage() {
     }
   }, [session, userProfile]);
 
-  // Función para manejar la subida de imagen desde la PC (convirtiendo a Base64)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isSuperEdit: boolean = false) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, targetField: 'nuevo' | 'edit' | 'global') => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
-        if (isSuperEdit) {
-          setEditLogoUrl(base64String);
-        } else {
-          setNuevoLogoUrl(base64String);
+        if (targetField === 'nuevo') setNuevoLogoUrl(base64String);
+        if (targetField === 'edit') setEditLogoUrl(base64String);
+        if (targetField === 'global') {
+          setGlobalLogo(base64String);
+          localStorage.setItem('global_app_logo', base64String);
+          alert('¡Logo global actualizado para toda la aplicación!');
         }
       };
       reader.readAsDataURL(file);
@@ -272,7 +296,7 @@ export default function CRMPage() {
     setSavingLogo(false);
     if (!error) {
       setEmpresaActualLogo(nuevoLogoUrl);
-      alert('¡Logo actualizado con éxito en todo el CRM!');
+      alert('¡Logo actualizado con éxito!');
     } else {
       alert('Error al actualizar el logo: ' + error.message);
     }
@@ -284,7 +308,12 @@ export default function CRMPage() {
 
     const { data: empData, error: empError } = await supabase
       .from('empresas')
-      .insert([{ nombre: nuevaEmpresaNombre, logo_url: nuevoLogoUrl }])
+      .insert([{ 
+        nombre: nuevaEmpresaNombre, 
+        telefono: nuevoTelefono, 
+        direccion: nuevaDireccion, 
+        logo_url: nuevoLogoUrl || globalLogo || '/logo.png' 
+      }])
       .select()
       .single();
 
@@ -313,8 +342,11 @@ export default function CRMPage() {
       setAdminEmpresaEmail('');
       setAdminEmpresaPass('');
       setAdminEmpresaNombre('');
+      setNuevoTelefono('');
+      setNuevaDireccion('');
       setNuevoLogoUrl('');
       fetchEmpresas();
+      fetchAllLeadsForSuperadmin();
     } else {
       alert('Empresa creada, pero error al crear usuario admin: ' + signUpError.message);
     }
@@ -337,6 +369,7 @@ export default function CRMPage() {
       alert('Negocio actualizado con éxito');
       setEditingEmpresa(null);
       fetchEmpresas();
+      fetchAllLeadsForSuperadmin();
     } else {
       alert('Error al actualizar negocio: ' + error.message);
     }
@@ -347,6 +380,7 @@ export default function CRMPage() {
     const { error } = await supabase.from('empresas').delete().eq('id', id);
     if (!error) {
       fetchEmpresas();
+      fetchAllLeadsForSuperadmin();
       alert('Negocio eliminado con éxito');
     } else {
       alert('Error al eliminar negocio: ' + error.message);
@@ -357,6 +391,7 @@ export default function CRMPage() {
     const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', leadId);
     if (!error) {
       fetchDirige();
+      fetchAllLeadsForSuperadmin();
     } else {
       alert('Error al actualizar estado: ' + error.message);
     }
@@ -695,7 +730,7 @@ export default function CRMPage() {
     return `https://wa.me/${phone}?text=${encodeURIComponent(customizedMessage)}`;
   };
 
-  const activeLogoSrc = empresaActualLogo || '/logo.png';
+  const activeLogoSrc = globalLogo || empresaActualLogo || '/logo.png';
 
   if (authLoading) {
     return (
@@ -822,9 +857,17 @@ export default function CRMPage() {
 
             <div className="flex-1 overflow-y-auto py-2 space-y-1">
               {userProfile?.role === 'superadmin' ? (
-                <button onClick={() => { setCurrentTab('superadmin'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-blue-400 hover:bg-slate-800 text-sm font-bold transition text-left">
-                  <span className="mr-3">🏢</span> Gestionar Negocios
-                </button>
+                <>
+                  <button onClick={() => { setCurrentTab('superadmin'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-blue-400 hover:bg-slate-800 text-sm font-bold transition text-left">
+                    <span className="mr-3">🏢</span> Gestionar Negocios
+                  </button>
+                  <button onClick={() => { setCurrentTab('superadminLeads'); setIsSidebarOpen(false); fetchAllLeadsForSuperadmin(); }} className="w-full flex items-center px-6 py-3 text-blue-400 hover:bg-slate-800 text-sm font-bold transition text-left">
+                    <span className="mr-3">🎯</span> Leads de todos los Negocios
+                  </button>
+                  <button onClick={() => { setCurrentTab('configGlobal'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-blue-400 hover:bg-slate-800 text-sm font-bold transition text-left">
+                    <span className="mr-3">⚙️</span> Configuración Global (Logo App)
+                  </button>
+                </>
               ) : (
                 <>
                   <button onClick={() => { setIsOnboardingOpen(true); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
@@ -851,9 +894,6 @@ export default function CRMPage() {
                   <button onClick={() => { setCurrentTab('equipo'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
                     <span className="mr-3">⚙️</span> Vendedores / Equipo
                   </button>
-                  <button onClick={() => { setCurrentTab('configuracion'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-blue-400 hover:bg-slate-800 text-sm font-bold transition text-left">
-                    <span className="mr-3">🖼️</span> Configurar Logo / Marca
-                  </button>
                 </>
               )}
             </div>
@@ -867,54 +907,108 @@ export default function CRMPage() {
       )}
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="flex-1 overflow-y-auto pb-24 p-4 max-w-4xl mx-auto w-full">
+      <main className="flex-1 overflow-y-auto pb-24 p-4 max-w-5xl mx-auto w-full">
         
-        {/* PANEL CONFIGURACIÓN LOGO */}
-        {userProfile?.role !== 'superadmin' && currentTab === 'configuracion' && (
+        {/* VISTA SUPERADMIN: LEADS DE TODOS LOS NEGOCIOS ORGANIZADOS POR ESTADO */}
+        {userProfile?.role === 'superadmin' && currentTab === 'superadminLeads' && (
           <div className="space-y-4">
-            <h2 className="text-base font-bold text-white mb-2">Configuración de Logotipo (Automatízalo)</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+              <div>
+                <h2 className="text-base font-bold text-white">Monitoreo de Leads por Negocio</h2>
+                <p className="text-xs text-gray-400">Revisa los prospectos y estados de cada cliente registrado.</p>
+              </div>
+              <select 
+                value={selectedEmpresaLeadsId} 
+                onChange={(e) => setSelectedEmpresaLeadsId(e.target.value)}
+                className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold outline-none cursor-pointer"
+              >
+                <option value="todos">🏢 Todos los Negocios</option>
+                {empresas.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {statuses.map((st) => {
+                const filteredLeads = allLeadsSuperadmin.filter(l => {
+                  const matchEmpresa = selectedEmpresaLeadsId === 'todos' || l.empresa_id === selectedEmpresaLeadsId;
+                  const matchStatus = (l.status || 'NUEVO/ SIN CONTACTAR') === st;
+                  return matchEmpresa && matchStatus;
+                });
+
+                const statusBgColor = 
+                  st === 'NUEVO/ SIN CONTACTAR' ? 'border-blue-700/50 text-blue-300 bg-blue-950/30' :
+                  st === 'EN SEGUIMIENTO' ? 'border-amber-700/50 text-amber-300 bg-amber-950/30' :
+                  st === 'CITA AGENDA' ? 'border-emerald-700/50 text-emerald-300 bg-emerald-950/30' : 'border-red-700/50 text-red-300 bg-red-950/30';
+
+                return (
+                  <div key={st} className={`border rounded-2xl p-3.5 bg-slate-900 flex flex-col h-[70vh] shadow-lg ${statusBgColor}`}>
+                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
+                      <span className="text-[11px] font-black uppercase tracking-wider">{st}</span>
+                      <span className="bg-slate-950 px-2 py-0.5 rounded-full text-xs font-mono font-bold text-white">{filteredLeads.length}</span>
+                    </div>
+
+                    <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+                      {filteredLeads.length === 0 ? (
+                        <p className="text-center text-gray-500 text-xs py-8">Sin leads en este estado.</p>
+                      ) : (
+                        filteredLeads.map(lead => (
+                          <div key={lead.id} className="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-1.5 shadow">
+                            <div className="flex justify-between items-start">
+                              <h4 className="font-bold text-white text-xs">{lead.full_name || lead.name}</h4>
+                              <span className="text-[9px] bg-blue-900/50 text-blue-300 px-1.5 py-0.5 rounded font-mono">{lead.empresas?.nombre || 'Negocio'}</span>
+                            </div>
+                            <p className="text-[11px] text-gray-400">📞 {lead.phone}</p>
+                            {lead.notes && <p className="text-[10px] text-amber-300/90 italic bg-slate-900 p-1 rounded">Nota: {lead.notes}</p>}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* CONFIGURACIÓN GLOBAL (SOLO SUPERADMIN) */}
+        {userProfile?.role === 'superadmin' && currentTab === 'configGlobal' && (
+          <div className="space-y-4">
+            <h2 className="text-base font-bold text-white mb-2">Configuración Global de la Aplicación</h2>
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-lg">
               <p className="text-xs text-gray-300">
-                Sube una imagen directamente desde tu PC para establecer el logo oficial que se mostrará en todo el CRM.
+                Sube el logotipo oficial de Automatízalo desde tu PC. Este logo se aplicará instantáneamente como identidad global en todos los negocios de la plataforma.
               </p>
               
               <div className="flex items-center space-x-4 py-3">
                 <div className="w-16 h-16 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-full overflow-hidden p-1 shadow-md">
-                  <img src={activeLogoSrc} alt="Logo Actual" className="w-full h-full object-contain rounded-full" />
+                  <img src={activeLogoSrc} alt="Logo Global" className="w-full h-full object-contain rounded-full" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-white">Vista previa del logotipo activo</p>
-                  <p className="text-[10px] text-gray-400">Formato circular optimizado</p>
+                  <p className="text-xs font-bold text-white">Logotipo Maestro Activo</p>
+                  <p className="text-[10px] text-gray-400">Visible en todos los paneles y negocios</p>
                 </div>
               </div>
 
-              <form onSubmit={handleUpdateLogoEmpresa} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1">Seleccionar Logo desde la PC</label>
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, false)} 
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" 
-                  />
-                </div>
-                <button 
-                  type="submit" 
-                  disabled={savingLogo} 
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow"
-                >
-                  {savingLogo ? 'Guardando Logo...' : 'Aplicar Logo en la Aplicación'}
-                </button>
-              </form>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Subir Logo Maestro (Desde PC)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => handleFileUpload(e, 'global')} 
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" 
+                />
+              </div>
             </div>
           </div>
         )}
 
         {/* PANEL SUPERADMIN */}
-        {userProfile?.role === 'superadmin' && (
+        {userProfile?.role === 'superadmin' && currentTab === 'superadmin' && (
           <div className="space-y-6">
             
-            {/* PANEL DE EDICIÓN O CREACIÓN */}
+            {/* PANEL DE EDICIÓN O CREACIÓN UNIFICADA */}
             {editingEmpresa ? (
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 border-blue-500/50">
                 <h2 className="text-lg font-bold text-white flex items-center space-x-2">
@@ -934,8 +1028,8 @@ export default function CRMPage() {
                     <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={editDireccion} onChange={e => setEditDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-300 mb-1">Cargar Logotipo desde la PC</label>
-                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, true)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white" />
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Logotipo del Negocio (Desde PC)</label>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'edit')} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white" />
                   </div>
                   <div className="flex space-x-2 pt-2">
                     <button type="button" onClick={() => setEditingEmpresa(null)} className="flex-1 py-2.5 bg-slate-800 text-gray-300 rounded-xl text-xs font-bold">Cancelar</button>
@@ -969,9 +1063,19 @@ export default function CRMPage() {
                     <label className="block text-xs font-bold text-gray-300 mb-1">Contraseña del Administrador</label>
                     <input type="password" required placeholder="••••••••" value={adminEmpresaPass} onChange={e => setAdminEmpresaPass(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-300 mb-1">Número de Teléfono (WhatsApp)</label>
+                      <input type="text" placeholder="Ej. 5493854123456" value={nuevoTelefono} onChange={e => setNuevoTelefono(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-300 mb-1">Dirección del Local</label>
+                      <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={nuevaDireccion} onChange={e => setNuevaDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                    </div>
+                  </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-300 mb-1">Logotipo Inicial (Desde PC)</label>
-                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, false)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white" />
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Logotipo del Negocio (Desde PC)</label>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'nuevo')} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white" />
                   </div>
                   <button type="submit" disabled={savingEmpresa} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow">
                     {savingEmpresa ? 'Creando Empresa...' : 'Registrar Negocio y Crear Cuenta Admin'}
@@ -989,7 +1093,7 @@ export default function CRMPage() {
                     <div className="space-y-1">
                       <div className="flex items-center space-x-2">
                         <div className="w-7 h-7 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-full overflow-hidden p-0.5">
-                          <img src={emp.logo_url || '/logo.png'} alt="Logo" className="w-full h-full object-contain rounded-full" />
+                          <img src={emp.logo_url || activeLogoSrc} alt="Logo" className="w-full h-full object-contain rounded-full" />
                         </div>
                         <h4 className="font-bold text-white text-sm">{emp.nombre}</h4>
                       </div>
