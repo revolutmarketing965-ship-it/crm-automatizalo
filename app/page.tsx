@@ -22,7 +22,6 @@ export default function CRMPage() {
   const [socios, setSocios] = useState<any[]>([]);
   const [perfilesEquipo, setPerfilesEquipo] = useState<any[]>([]);
 
-  const [selectedStatus, setSelectedStatus] = useState('NUEVO/ SIN CONTACTAR');
   const statuses = [
     'NUEVO/ SIN CONTACTAR',
     'EN SEGUIMIENTO',
@@ -384,10 +383,6 @@ export default function CRMPage() {
     return `https://wa.me/${phone}?text=${encodeURIComponent(customizedMessage)}`;
   };
 
-  const filteredLeads = dirige.filter(
-    (lead) => (lead.status || 'NUEVO/ SIN CONTACTAR') === selectedStatus
-  );
-
   const totalLeadsCount = dirige.length;
   const totalCitasCount = equipoCitas.length;
   const totalSociosCount = socios.length;
@@ -549,15 +544,15 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl z-10 space-y-5 text-gray-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🚀</span> <span>Onboarding & Estados</span>
+                <span>🚀</span> <span>Onboarding & Gestión</span>
               </h3>
               <button onClick={() => setIsOnboardingOpen(false)} className="text-gray-400 hover:text-white font-bold text-lg">✕</button>
             </div>
             
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">1. Estados Directos en cada Contacto</h4>
-                <p>Ahora cuentas con un selector de colores editable arriba de cada tarjeta o elemento de lista para cambiar su estado al instante.</p>
+                <h4 className="font-bold text-blue-400 text-sm">1. Selector de Estado Directo</h4>
+                <p>Modifica el estado de cada lead directamente desde el selector de color ubicado en la parte superior de su tarjeta o renglón.</p>
               </div>
             </div>
 
@@ -617,39 +612,13 @@ export default function CRMPage() {
               </button>
             </div>
 
-            {/* FILTRO HORIZONTAL DE ESTADOS */}
-            {activeView !== 'kanban' && (
-              <div className="bg-slate-900 border border-slate-800 overflow-x-auto whitespace-nowrap px-2 py-2 rounded-xl shadow-sm">
-                <div className="flex space-x-2">
-                  {statuses.map((status) => {
-                    const count = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === status).length;
-                    const isSelected = selectedStatus === status;
-                    return (
-                      <button
-                        key={status}
-                        onClick={() => setSelectedStatus(status)}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center space-x-2 ${
-                          isSelected ? 'bg-blue-900/50 text-blue-300 border border-blue-700' : 'bg-slate-800 text-gray-400'
-                        }`}
-                      >
-                        <span>{status}</span>
-                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300'}`}>
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {loadingLeads ? (
               <p className="text-center text-gray-500 py-10 text-xs">Cargando prospectos...</p>
-            ) : filteredLeads.length === 0 ? (
-              <p className="text-center text-gray-500 py-10 text-xs">No hay leads en este estado.</p>
+            ) : dirige.length === 0 ? (
+              <p className="text-center text-gray-500 py-10 text-xs">No hay leads registrados.</p>
             ) : activeView === 'lista' ? (
               <div className="space-y-2">
-                {filteredLeads.map((l) => {
+                {dirige.map((l) => {
                   const currentLeadStatus = l.status || 'NUEVO/ SIN CONTACTAR';
                   const statusBgColor = 
                     currentLeadStatus === 'NUEVO/ SIN CONTACTAR' ? 'bg-blue-950/80 border-blue-700 text-blue-300' :
@@ -659,7 +628,7 @@ export default function CRMPage() {
                   return (
                     <div key={l.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
                       <div className="flex-1 space-y-1.5 w-full">
-                        {/* Nombre de estado editable arriba */}
+                        {/* Selector de estado editable arriba */}
                         <div className="flex items-center space-x-2">
                           <select
                             value={currentLeadStatus}
@@ -720,7 +689,7 @@ export default function CRMPage() {
               </div>
             ) : activeView === 'tarjetas' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {filteredLeads.map((l) => {
+                {dirige.map((l) => {
                   const currentLeadStatus = l.status || 'NUEVO/ SIN CONTACTAR';
                   const statusBgColor = 
                     currentLeadStatus === 'NUEVO/ SIN CONTACTAR' ? 'bg-blue-950/80 border-blue-700 text-blue-300' :
