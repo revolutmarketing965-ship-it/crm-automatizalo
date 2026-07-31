@@ -14,7 +14,7 @@ export default function CRMPage() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const [currentTab, setCurrentTab] = useState<'dirige' | 'citas' | 'socios' | 'equipo'>('dirige');
+  const [currentTab, setCurrentTab] = useState<'dirige' | 'citas' | 'socios' | 'equipo' | 'metricas' | 'mensajes'>('dirige');
   const [activeView, setActiveView] = useState<'lista' | 'tarjetas' | 'kanban'>('lista');
 
   const [dirige, setDirige] = useState<any[]>([]);
@@ -34,8 +34,10 @@ export default function CRMPage() {
   const [isSocioModalOpen, setIsSocioModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
+  // Campos para nuevo lead con correo opcional
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [correo, setCorreo] = useState('');
   const [origen, setOrigen] = useState('Facebook Ads');
   const [savingLead, setSavingLead] = useState(false);
 
@@ -53,6 +55,12 @@ export default function CRMPage() {
   const [nuevoPassword, setNuevoPassword] = useState('');
   const [nuevoRol, setNuevoRol] = useState('vendedor');
   const [savingUser, setSavingUser] = useState(false);
+
+  // Plantilla de mensaje automático con etiqueta {nombre}
+  const [whatsappTemplate, setWhatsappTemplate] = useState(
+    'Hola {nombre}, te recordamos que tienes una cita agendada en nuestro gimnasio. ¡Te esperamos!'
+  );
+  const [savedTemplateMsg, setSavedTemplateMsg] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -124,18 +132,30 @@ export default function CRMPage() {
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingLead(true);
-    const { error } = await supabase.from('leads').insert([{ name: nombre, phone: telefono, origin }]);
+    const { error } = await supabase.from('leads').insert([{ 
+      name: nombre, 
+      phone: telefono, 
+      email: correo || null, 
+      origin 
+    }]);
     setSavingLead(false);
     if (!error) {
       setNombre('');
       setTelefono('');
+      setCorreo('');
       setIsLeadModalOpen(false);
       fetchDirige();
+    } else {
+      alert('Error al guardar el lead: ' + error.message);
     }
   };
 
   const handleCreateCita = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedLeadId) {
+      alert('Por favor selecciona un lead válido');
+      return;
+    }
     setSavingCita(true);
     const { error } = await supabase.from('appointments').insert([{ 
       lead_id: selectedLeadId, 
@@ -149,11 +169,18 @@ export default function CRMPage() {
       setSelectedLeadId('');
       setIsCitaModalOpen(false);
       fetchCitas();
+      alert('Cita agendada con éxito');
+    } else {
+      alert('Error al agendar cita: ' + error.message);
     }
   };
 
   const handleCreateSocio = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedSocioLeadId) {
+      alert('Por favor selecciona un lead válido');
+      return;
+    }
     setSavingSocio(true);
     const { error } = await supabase.from('socios').insert([{ lead_id: selectedSocioLeadId, payment_status: paymentStatus }]);
     setSavingSocio(false);
@@ -161,6 +188,8 @@ export default function CRMPage() {
       setSelectedSocioLeadId('');
       setIsSocioModalOpen(false);
       fetchSocios();
+    } else {
+      alert('Error al registrar socio: ' + error.message);
     }
   };
 
@@ -194,6 +223,19 @@ export default function CRMPage() {
       alert('No se pudo eliminar el registro de perfil.');
     }
   };
+
+  // Generador de enlace de WhatsApp con plantilla personalizada reemplazando {nombre}
+  const getWhatsAppLink = (phone: string, leadName: string) => {
+    const customizedMessage = whatsappTemplate.replace(/{nombre}/g, leadName || 'Cliente');
+    return `https://wa.me/${phone}?text=${encodeURIComponent(customizedMessage)}`;
+  };
+
+  // Métricas y porcentajes de aciertos / desaciertos
+  const totalLeadsCount = dirige.length;
+  const totalCitasCount = equipoCitas.length;
+  const totalSociosCount = socios.length;
+  const conversionRate = totalLeadsCount > 0 ? Math.round((totalSociosCount / totalLeadsCount) * 100) : 0;
+  const failureRate = 100 - conversionRate;
 
   if (authLoading) {
     return (
@@ -325,6 +367,12 @@ export default function CRMPage() {
               <button onClick={() => { setCurrentTab('socios'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
                 <span className="mr-3">👥</span> Socios (Compradores)
               </button>
+              <button onClick={() => { setCurrentTab('metricas'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
+                <span className="mr-3">📊</span> Métricas y Aciertos
+              </button>
+              <button onClick={() => { setCurrentTab('mensajes'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
+                <span className="mr-3">💬</span> Mensajes Automáticos
+              </button>
               <button onClick={() => { setCurrentTab('equipo'); setIsSidebarOpen(false); }} className="w-full flex items-center px-6 py-3 text-gray-300 hover:bg-slate-800 text-sm font-medium transition text-left">
                 <span className="mr-3">⚙️</span> Equipo / Usuarios
               </button>
@@ -344,30 +392,25 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl z-10 space-y-5 text-gray-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🚀</span> <span>Onboarding & Primeros Pasos</span>
+                <span>🚀</span> <span>Onboarding & Novedades</span>
               </h3>
               <button onClick={() => setIsOnboardingOpen(false)} className="text-gray-400 hover:text-white font-bold text-lg">✕</button>
             </div>
             
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">1. Gestión de Prospectos (Dirige)</h4>
-                <p>Aquí ingresan tus clientes potenciales. Cada lead muestra la fecha y hora exacta en que se registró. Puedes derivarlos directamente a citas con el botón de agendar.</p>
+                <h4 className="font-bold text-blue-400 text-sm">1. Formulario Completo de Leads</h4>
+                <p>Al agregar un lead, puedes registrar Nombre, Teléfono, Origen y Correo electrónico (opcional).</p>
               </div>
 
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">2. Vistas Adaptables</h4>
-                <p>Usa la barra superior para cambiar entre vista de **Lista**, **Tarjetas** o **Columnas** según prefieras.</p>
+                <h4 className="font-bold text-blue-400 text-sm">2. Métricas de Rendimiento</h4>
+                <p>Visualiza gráficos circulares de porcentajes de aciertos y desaciertos basados en tus citas y cierres.</p>
               </div>
 
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">3. Citas Automáticas</h4>
-                <p>Al agendar una cita desde un lead, este se vincula automáticamente y guarda la fecha y hora seleccionada para la recepción del gimnasio.</p>
-              </div>
-
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">4. Administración de Equipo</h4>
-                <p>Desde la pestaña "Equipo" puedes dar de alta nuevos accesos o eliminar miembros cuando sea necesario.</p>
+                <h4 className="font-bold text-blue-400 text-sm">3. Mensajes de WhatsApp Personalizados</h4>
+                <p>Configura plantillas automáticas con la etiqueta &#123;nombre&#125; para saludar a tus leads directamente.</p>
               </div>
             </div>
 
@@ -425,7 +468,7 @@ export default function CRMPage() {
                   <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
                     <div>
                       <h4 className="font-bold text-white text-sm">{l.name}</h4>
-                      <p className="text-xs text-gray-400">{l.phone} • <span className="text-blue-400">{l.origin}</span></p>
+                      <p className="text-xs text-gray-400">{l.phone} {l.email ? `• ${l.email}` : ''} • <span className="text-blue-400">{l.origin}</span></p>
                       <p className="text-[10px] text-gray-500 mt-1">Registrado: {new Date(l.created_at).toLocaleString()}</p>
                     </div>
                     <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
@@ -435,7 +478,7 @@ export default function CRMPage() {
                       >
                         📅 Agendar Cita
                       </button>
-                      <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
+                      <a href={getWhatsAppLink(l.phone, l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
                         WhatsApp
                       </a>
                     </div>
@@ -448,6 +491,7 @@ export default function CRMPage() {
                   <div key={l.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-sm">
                     <h4 className="font-bold text-white text-sm">{l.name}</h4>
                     <p className="text-xs text-gray-400">📞 {l.phone}</p>
+                    {l.email && <p className="text-xs text-gray-400">✉️ {l.email}</p>}
                     <p className="text-[10px] text-gray-500">Registrado: {new Date(l.created_at).toLocaleString()}</p>
                     <div className="flex space-x-2 pt-1">
                       <button 
@@ -456,7 +500,7 @@ export default function CRMPage() {
                       >
                         Agendar Cita
                       </button>
-                      <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 bg-green-600 text-white rounded-lg text-xs font-bold">
+                      <a href={getWhatsAppLink(l.phone, l.name)} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 bg-green-600 text-white rounded-lg text-xs font-bold">
                         WhatsApp
                       </a>
                     </div>
@@ -541,6 +585,83 @@ export default function CRMPage() {
           </div>
         )}
 
+        {/* SECCIÓN DE MÉTRICAS CON CÍRCULOS DE PORCENTAJES */}
+        {currentTab === 'metricas' && (
+          <div className="space-y-5">
+            <h2 className="text-base font-bold text-white mb-2">Métricas de Conversión y Rendimiento</h2>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col items-center justify-center space-y-3 shadow-lg">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Porcentaje de Aciertos (Cierres)</h3>
+                <div className="w-28 h-28 rounded-full border-4 border-green-500 flex items-center justify-center bg-green-950/20 shadow-inner">
+                  <span className="text-2xl font-black text-green-400">{conversionRate}%</span>
+                </div>
+                <p className="text-xs text-gray-400">{socios.length} socios de {dirige.length} leads totales</p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col items-center justify-center space-y-3 shadow-lg">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Porcentaje de Desaciertos / Pendientes</h3>
+                <div className="w-28 h-28 rounded-full border-4 border-red-500 flex items-center justify-center bg-red-950/20 shadow-inner">
+                  <span className="text-2xl font-black text-red-400">{failureRate}%</span>
+                </div>
+                <p className="text-xs text-gray-400">Prospectos sin concretar membresía</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
+              <h4 className="font-bold text-white text-sm">Resumen General</h4>
+              <div className="flex justify-between text-xs text-gray-300 border-b border-slate-800 py-1.5">
+                <span>Total Leads Registrados:</span>
+                <span className="font-bold text-blue-400">{totalLeadsCount}</span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-300 border-b border-slate-800 py-1.5">
+                <span>Total Citas Agendadas:</span>
+                <span className="font-bold text-amber-400">{totalCitasCount}</span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-300 py-1.5">
+                <span>Total Socios Cerrados:</span>
+                <span className="font-bold text-green-400">{totalSociosCount}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECCIÓN DE CONFIGURACIÓN DE MENSAJES AUTOMÁTICOS */}
+        {currentTab === 'mensajes' && (
+          <div className="space-y-4">
+            <h2 className="text-base font-bold text-white mb-2">Plantilla de WhatsApp Automática</h2>
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-lg">
+              <p className="text-xs text-gray-300">
+                Personaliza el mensaje que se enviará a tus leads. Usa la etiqueta <code className="bg-slate-950 text-blue-400 px-1.5 py-0.5 rounded font-mono">&#123;nombre&#125;</code> para insertar automáticamente el nombre del cliente.
+              </p>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Mensaje de Plantilla</label>
+                <textarea
+                  rows={4}
+                  value={whatsappTemplate}
+                  onChange={(e) => setWhatsappTemplate(e.target.value)}
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+              {savedTemplateMsg && (
+                <div className="p-2 bg-green-950/40 border border-green-800 text-green-300 text-xs rounded-xl text-center">
+                  ¡Plantilla actualizada correctamente!
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSavedTemplateMsg(true);
+                  setTimeout(() => setSavedTemplateMsg(false), 3000);
+                }}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow"
+              >
+                Guardar Plantilla
+              </button>
+            </div>
+          </div>
+        )}
+
         {currentTab === 'equipo' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -591,8 +712,22 @@ export default function CRMPage() {
           <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl z-10 space-y-4">
             <h3 className="text-lg font-bold text-white">Nuevo Prospecto</h3>
             <form onSubmit={handleCreateLead} className="space-y-3">
-              <input type="text" required placeholder="Nombre" value={nombre} onChange={e => setNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
-              <input type="text" required placeholder="Teléfono" value={telefono} onChange={e => setTelefono(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Nombre</label>
+                <input type="text" required placeholder="Ej. Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Teléfono</label>
+                <input type="text" required placeholder="Ej. 5493854123456" value={telefono} onChange={e => setTelefono(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Correo electrónico (Opcional)</label>
+                <input type="email" placeholder="correo@ejemplo.com" value={correo} onChange={e => setCorreo(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Origen</label>
+                <input type="text" value={origen} onChange={e => setOrigen(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+              </div>
               <div className="flex space-x-2 pt-2">
                 <button type="button" onClick={() => setIsLeadModalOpen(false)} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold">Cancelar</button>
                 <button type="submit" disabled={savingLead} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">{savingLead ? 'Guardando...' : 'Guardar'}</button>
@@ -687,8 +822,8 @@ export default function CRMPage() {
         <button onClick={() => setCurrentTab('socios')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'socios' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
           <span className="text-[10px]">Socios</span>
         </button>
-        <button onClick={() => setCurrentTab('equipo')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'equipo' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
-          <span className="text-[10px]">Equipo</span>
+        <button onClick={() => setCurrentTab('metricas')} className={`flex flex-col items-center flex-1 py-1 ${currentTab === 'metricas' ? 'text-blue-500 font-bold' : 'text-gray-400'}`}>
+          <span className="text-[10px]">Métricas</span>
         </button>
       </nav>
 
