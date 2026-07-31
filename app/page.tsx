@@ -22,7 +22,6 @@ export default function CRMPage() {
   const [socios, setSocios] = useState<any[]>([]);
   const [perfilesEquipo, setPerfilesEquipo] = useState<any[]>([]);
 
-  // Estado seleccionado para filtrar leads
   const [selectedStatus, setSelectedStatus] = useState('NUEVO/ SIN CONTACTAR');
   const statuses = [
     'NUEVO/ SIN CONTACTAR',
@@ -47,7 +46,6 @@ export default function CRMPage() {
   const [editingCita, setEditingCita] = useState<any>(null);
   const [editingSocio, setEditingSocio] = useState<any>(null);
 
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [currentNoteTarget, setCurrentNoteTarget] = useState<{ type: 'lead' | 'cita' | 'socio', id: string, name: string, notes: string } | null>(null);
   const [savingNote, setSavingNote] = useState(false);
 
@@ -147,6 +145,15 @@ export default function CRMPage() {
       fetchTeam();
     }
   }, [session]);
+
+  const handleUpdateLeadStatusInline = async (leadId: string, newStatus: string) => {
+    const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', leadId);
+    if (!error) {
+      fetchDirige();
+    } else {
+      alert('Error al actualizar estado: ' + error.message);
+    }
+  };
 
   const handleCreateOrUpdateLead = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -334,7 +341,6 @@ export default function CRMPage() {
 
     setSavingNote(false);
     if (!error) {
-      setIsNoteModalOpen(false);
       setCurrentNoteTarget(null);
       if (currentNoteTarget.type === 'lead') fetchDirige();
       if (currentNoteTarget.type === 'cita') fetchCitas();
@@ -550,13 +556,8 @@ export default function CRMPage() {
             
             <div className="space-y-4 text-xs md:text-sm text-gray-300 max-h-[60vh] overflow-y-auto pr-2">
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">1. Estados de Leads</h4>
-                <p>Clasifica tus prospectos entre Nuevos, En Seguimiento, Cita Agendada o Perdidos para mantener un control absoluto.</p>
-              </div>
-
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
-                <h4 className="font-bold text-blue-400 text-sm">2. Edición y Notas</h4>
-                <p>Edita cualquier registro y agrega notas personalizadas para conocer mejor a cada cliente.</p>
+                <h4 className="font-bold text-blue-400 text-sm">1. Estados Directos en cada Contacto</h4>
+                <p>Ahora cuentas con un selector de colores editable arriba de cada tarjeta o elemento de lista para cambiar su estado al instante.</p>
               </div>
             </div>
 
@@ -570,7 +571,6 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* SELECTOR DE VISTAS (EN SECCIÓN DIRIGE) */}
       {currentTab === 'dirige' && (
         <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex justify-center space-x-2 sticky top-[53px] z-10 shadow-sm">
           <button
@@ -617,7 +617,7 @@ export default function CRMPage() {
               </button>
             </div>
 
-            {/* FILTRO HORIZONTAL DE ESTADOS DE LEADS */}
+            {/* FILTRO HORIZONTAL DE ESTADOS */}
             {activeView !== 'kanban' && (
               <div className="bg-slate-900 border border-slate-800 overflow-x-auto whitespace-nowrap px-2 py-2 rounded-xl shadow-sm">
                 <div className="flex space-x-2">
@@ -649,12 +649,96 @@ export default function CRMPage() {
               <p className="text-center text-gray-500 py-10 text-xs">No hay leads en este estado.</p>
             ) : activeView === 'lista' ? (
               <div className="space-y-2">
-                {filteredLeads.map((l) => (
-                  <div key={l.id} className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
+                {filteredLeads.map((l) => {
+                  const currentLeadStatus = l.status || 'NUEVO/ SIN CONTACTAR';
+                  const statusBgColor = 
+                    currentLeadStatus === 'NUEVO/ SIN CONTACTAR' ? 'bg-blue-950/80 border-blue-700 text-blue-300' :
+                    currentLeadStatus === 'EN SEGUIMIENTO' ? 'bg-amber-950/80 border-amber-700 text-amber-300' :
+                    currentLeadStatus === 'CITA AGENDA' ? 'bg-emerald-950/80 border-emerald-700 text-emerald-300' : 'bg-red-950/80 border-red-700 text-red-300';
+
+                  return (
+                    <div key={l.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-sm gap-2">
+                      <div className="flex-1 space-y-1.5 w-full">
+                        {/* Nombre de estado editable arriba */}
+                        <div className="flex items-center space-x-2">
+                          <select
+                            value={currentLeadStatus}
+                            onChange={(e) => handleUpdateLeadStatusInline(l.id, e.target.value)}
+                            className={`text-[10px] font-black px-2 py-1 rounded-lg border outline-none cursor-pointer uppercase ${statusBgColor}`}
+                          >
+                            {statuses.map((st) => (
+                              <option key={st} value={st} className="bg-slate-950 text-white">{st}</option>
+                            ))}
+                          </select>
+                          <button 
+                            onClick={() => setCurrentNoteTarget({ type: 'lead', id: l.id, name: l.full_name || l.name, notes: l.notes || '' })}
+                            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
+                          >
+                            📝 {l.notes ? 'Ver Nota' : '+ Nota'}
+                          </button>
+                        </div>
+
                         <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
-                        <span className="text-[10px] bg-slate-800 text-blue-300 px-2 py-0.5 rounded border border-slate-700">{l.status || 'NUEVO/ SIN CONTACTAR'}</span>
+                        <p className="text-xs text-gray-400">{l.phone} {l.email ? `• ${l.email}` : ''} • <span className="text-blue-400">{l.origin}</span></p>
+                        {l.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
+                      </div>
+                      <div className="flex items-center space-x-2 w-full sm:w-auto justify-end pt-2 sm:pt-0">
+                        <button 
+                          onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
+                          className="px-3 py-1.5 bg-blue-600/30 text-blue-400 border border-blue-600/50 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition"
+                        >
+                          📅 Agendar
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setEditingLead(l);
+                            setNombre(l.full_name || l.name || '');
+                            setTelefono(l.phone || '');
+                            setCorreo(l.email || '');
+                            setOrigen(l.origin || 'Facebook Ads');
+                            setLeadStatus(l.status || 'NUEVO/ SIN CONTACTAR');
+                            setNotasLead(l.notes || '');
+                            setIsLeadModalOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition"
+                        >
+                          Editar
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteLead(l.id)}
+                          className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
+                        >
+                          Eliminar
+                        </button>
+                        <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
+                          WhatsApp
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : activeView === 'tarjetas' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {filteredLeads.map((l) => {
+                  const currentLeadStatus = l.status || 'NUEVO/ SIN CONTACTAR';
+                  const statusBgColor = 
+                    currentLeadStatus === 'NUEVO/ SIN CONTACTAR' ? 'bg-blue-950/80 border-blue-700 text-blue-300' :
+                    currentLeadStatus === 'EN SEGUIMIENTO' ? 'bg-amber-950/80 border-amber-700 text-amber-300' :
+                    currentLeadStatus === 'CITA AGENDA' ? 'bg-emerald-950/80 border-emerald-700 text-emerald-300' : 'bg-red-950/80 border-red-700 text-red-300';
+
+                  return (
+                    <div key={l.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2.5 shadow-sm">
+                      <div className="flex justify-between items-center">
+                        <select
+                          value={currentLeadStatus}
+                          onChange={(e) => handleUpdateLeadStatusInline(l.id, e.target.value)}
+                          className={`text-[10px] font-black px-2 py-1 rounded-lg border outline-none cursor-pointer uppercase ${statusBgColor}`}
+                        >
+                          {statuses.map((st) => (
+                            <option key={st} value={st} className="bg-slate-950 text-white">{st}</option>
+                          ))}
+                        </select>
                         <button 
                           onClick={() => setCurrentNoteTarget({ type: 'lead', id: l.id, name: l.full_name || l.name, notes: l.notes || '' })}
                           className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
@@ -662,95 +746,47 @@ export default function CRMPage() {
                           📝 {l.notes ? 'Ver Nota' : '+ Nota'}
                         </button>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">{l.phone} {l.email ? `• ${l.email}` : ''} • <span className="text-blue-400">{l.origin}</span></p>
-                      {l.notes && <p className="text-[11px] text-amber-300/90 italic mt-1 bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
-                    </div>
-                    <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
-                      <button 
-                        onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
-                        className="px-3 py-1.5 bg-blue-600/30 text-blue-400 border border-blue-600/50 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition"
-                      >
-                        📅 Agendar
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setEditingLead(l);
-                          setNombre(l.full_name || l.name || '');
-                          setTelefono(l.phone || '');
-                          setCorreo(l.email || '');
-                          setOrigen(l.origin || 'Facebook Ads');
-                          setLeadStatus(l.status || 'NUEVO/ SIN CONTACTAR');
-                          setNotasLead(l.notes || '');
-                          setIsLeadModalOpen(true);
-                        }}
-                        className="px-2.5 py-1.5 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700 transition"
-                      >
-                        Editar
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteLead(l.id)}
-                        className="px-2.5 py-1.5 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition"
-                      >
-                        Eliminar
-                      </button>
-                      <a href={getWhatsAppLink(l.phone, l.full_name || l.name)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">
-                        WhatsApp
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : activeView === 'tarjetas' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {filteredLeads.map((l) => (
-                  <div key={l.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2 shadow-sm">
-                    <div className="flex justify-between items-start">
+
                       <h4 className="font-bold text-white text-sm">{l.full_name || l.name}</h4>
-                      <button 
-                        onClick={() => setCurrentNoteTarget({ type: 'lead', id: l.id, name: l.full_name || l.name, notes: l.notes || '' })}
-                        className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-[10px] font-bold"
-                      >
-                        📝 {l.notes ? 'Ver Nota' : '+ Nota'}
-                      </button>
+                      <p className="text-xs text-gray-400">📞 {l.phone}</p>
+                      {l.email && <p className="text-xs text-gray-400">✉️ {l.email}</p>}
+                      {l.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
+                      
+                      <div className="flex space-x-2 pt-1">
+                        <button 
+                          onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
+                          className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold"
+                        >
+                          Agendar
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setEditingLead(l);
+                            setNombre(l.full_name || l.name || '');
+                            setTelefono(l.phone || '');
+                            setCorreo(l.email || '');
+                            setOrigen(l.origin || 'Facebook Ads');
+                            setLeadStatus(l.status || 'NUEVO/ SIN CONTACTAR');
+                            setNotasLead(l.notes || '');
+                            setIsLeadModalOpen(true);
+                          }}
+                          className="px-3 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold"
+                        >
+                          Editar
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteLead(l.id)}
+                          className="px-3 py-2 bg-red-600/20 text-red-400 rounded-lg text-xs font-bold"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
-                    <span className="inline-block text-[10px] bg-slate-800 text-blue-300 px-2 py-0.5 rounded border border-slate-700">{l.status || 'NUEVO/ SIN CONTACTAR'}</span>
-                    <p className="text-xs text-gray-400">📞 {l.phone}</p>
-                    {l.email && <p className="text-xs text-gray-400">✉️ {l.email}</p>}
-                    {l.notes && <p className="text-[11px] text-amber-300/90 italic bg-slate-950 p-1.5 rounded border border-slate-800">Nota: {l.notes}</p>}
-                    <div className="flex space-x-2 pt-1">
-                      <button 
-                        onClick={() => { setSelectedLeadId(l.id); setIsCitaModalOpen(true); }}
-                        className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold"
-                      >
-                        Agendar
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setEditingLead(l);
-                          setNombre(l.full_name || l.name || '');
-                          setTelefono(l.phone || '');
-                          setCorreo(l.email || '');
-                          setOrigen(l.origin || 'Facebook Ads');
-                          setLeadStatus(l.status || 'NUEVO/ SIN CONTACTAR');
-                          setNotasLead(l.notes || '');
-                          setIsLeadModalOpen(true);
-                        }}
-                        className="px-3 py-2 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold"
-                      >
-                        Editar
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteLead(l.id)}
-                        className="px-3 py-2 bg-red-600/20 text-red-400 rounded-lg text-xs font-bold"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
-              /* VISTA KANBAN DE COLUMNAS POR ESTADO */
+              /* VISTA KANBAN */
               <div className="flex space-x-4 overflow-x-auto pb-4">
                 {statuses.map((status) => {
                   const statusLeads = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === status);
