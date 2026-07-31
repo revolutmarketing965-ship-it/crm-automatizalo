@@ -305,9 +305,9 @@ export default function CRMPage() {
       await supabase.from('leads').update({ status: 'CITA AGENDA' }).eq('id', leadId);
       fetchSocios();
       fetchDirige();
-      alert('¡Socio registrado con éxito en el CRM!');
+      alert('¡Cliente registrado con éxito en el CRM!');
     } else {
-      alert('Error al registrar socio: ' + error.message);
+      alert('Error al registrar cliente: ' + error.message);
     }
   };
 
@@ -334,7 +334,7 @@ export default function CRMPage() {
         setIsSocioModalOpen(false);
         fetchSocios();
       } else {
-        alert('Error al actualizar socio: ' + error.message);
+        alert('Error al actualizar cliente: ' + error.message);
       }
     } else {
       if (!selectedSocioLeadId) {
@@ -352,16 +352,16 @@ export default function CRMPage() {
         setIsSocioModalOpen(false);
         fetchSocios();
       } else {
-        alert('Error al registrar socio: ' + error.message);
+        alert('Error al registrar cliente: ' + error.message);
       }
     }
   };
 
   const handleDeleteSocio = async (socioId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este socio?')) return;
+    if (!confirm('¿Estás seguro de eliminar este cliente?')) return;
     const { error } = await supabase.from('socios').delete().eq('id', socioId);
     if (!error) fetchSocios();
-    else alert('No se pudo eliminar el socio.');
+    else alert('No se pudo eliminar el cliente.');
   };
 
   const handleCreateOrUpdateMembresia = async (e: React.FormEvent) => {
@@ -385,7 +385,7 @@ export default function CRMPage() {
         setIsMembresiaModalOpen(false);
         fetchMembresias();
       } else {
-        alert('Error al actualizar membresía: ' + error.message);
+        alert('Error al actualizar plan: ' + error.message);
       }
     } else {
       const { error } = await supabase.from('membresias').insert([payload]);
@@ -397,16 +397,16 @@ export default function CRMPage() {
         setIsMembresiaModalOpen(false);
         fetchMembresias();
       } else {
-        alert('Error al crear membresía: ' + error.message);
+        alert('Error al crear plan: ' + error.message);
       }
     }
   };
 
   const handleDeleteMembresia = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta membresía?')) return;
+    if (!confirm('¿Estás seguro de eliminar este plan?')) return;
     const { error } = await supabase.from('membresias').delete().eq('id', id);
     if (!error) fetchMembresias();
-    else alert('No se pudo eliminar la membresía.');
+    else alert('No se pudo eliminar el plan.');
   };
 
   const handleSaveNote = async (e: React.FormEvent) => {
@@ -514,12 +514,16 @@ export default function CRMPage() {
     return (
       <div className="flex flex-col h-screen items-center justify-center bg-slate-950 text-gray-100 p-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-6">
-          <div className="flex flex-col items-center space-y-3">
-            <img 
-              src="/logo.png" 
-              alt="Automatízalo CRM" 
-              className="w-14 h-14 object-contain rounded-xl shadow-lg bg-slate-950 p-1" 
-            />
+          
+          {/* LOGO LOGIN CENTRADO Y NÍTIDO */}
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="w-16 h-16 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-2xl shadow-lg overflow-hidden p-1">
+              <img 
+                src="/logo.png" 
+                alt="Automatízalo CRM" 
+                className="w-full h-full object-contain" 
+              />
+            </div>
             <div className="text-center">
               <h1 className="text-lg font-bold text-white tracking-tight">AUTOMATÍZALO CRM</h1>
               <p className="text-xs text-gray-400 mt-0.5">Inicia sesión en tu CRM</p>
@@ -569,7 +573,7 @@ export default function CRMPage() {
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-gray-100 font-sans pb-16 md:pb-0">
       
-      {/* HEADER CON LOGO LIMPIO Y TEXTO CRM */}
+      {/* HEADER CON LOGO CENTRADO Y NÍTIDO */}
       <header className="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between sticky top-0 z-20 shadow-md">
         <div className="flex items-center space-x-3">
           <button 
@@ -580,12 +584,15 @@ export default function CRMPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
+          
           <div className="flex items-center space-x-2.5">
-            <img 
-              src="/logo.png" 
-              alt="Logo CRM" 
-              className="w-8 h-8 object-contain rounded-lg bg-slate-950 p-0.5 border border-slate-800" 
-            />
+            <div className="w-9 h-9 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-xl overflow-hidden p-0.5 shadow-sm">
+              <img 
+                src="/logo.png" 
+                alt="Logo CRM" 
+                className="w-full h-full object-contain" 
+              />
+            </div>
             <span className="font-bold text-sm tracking-tight text-white">AUTOMATÍZALO CRM</span>
           </div>
         </div>
@@ -606,7 +613,7 @@ export default function CRMPage() {
         </div>
       </header>
 
-      {/* MENÚ DESPLEGABLE (SIDEBAR) CON LOGO Y TEXTO CRM */}
+      {/* MENÚ DESPLEGABLE (SIDEBAR) CON LOGO CENTRADO Y NÍTIDO */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div 
@@ -616,11 +623,13 @@ export default function CRMPage() {
 
           <div className="relative w-80 bg-slate-900 h-full shadow-2xl flex flex-col z-10 border-r border-slate-800">
             <div className="p-5 border-b border-slate-800 flex items-center space-x-3 bg-slate-950 text-white">
-              <img 
-                src="/logo.png" 
-                alt="Logo Sidebar" 
-                className="w-10 h-10 object-contain rounded-xl bg-slate-900 p-1 border border-slate-800 shadow" 
-              />
+              <div className="w-11 h-11 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-1 shadow">
+                <img 
+                  src="/logo.png" 
+                  alt="Logo Sidebar" 
+                  className="w-full h-full object-contain" 
+                />
+              </div>
               <div>
                 <h2 className="font-bold text-sm leading-tight text-white">AUTOMATÍZALO</h2>
                 <span className="text-[11px] text-blue-400 font-medium">CRM Comercial</span>
