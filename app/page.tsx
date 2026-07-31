@@ -33,6 +33,12 @@ export default function CRMPage() {
   const [savingEmpresa, setSavingEmpresa] = useState(false);
   const [editingEmpresa, setEditingEmpresa] = useState<any>(null);
 
+  // Campos dinámicos para edición de empresa
+  const [editNombre, setEditNombre] = useState('');
+  const [editTelefono, setEditTelefono] = useState('');
+  const [editDireccion, setEditDireccion] = useState('');
+  const [editLogoUrl, setEditLogoUrl] = useState('');
+
   const [empresaActualLogo, setEmpresaActualLogo] = useState('');
   const [nuevoLogoUrl, setNuevoLogoUrl] = useState('');
   const [savingLogo, setSavingLogo] = useState(false);
@@ -253,57 +259,66 @@ export default function CRMPage() {
     }
   };
 
-  const handleCreateOrUpdateEmpresaMaster = async (e: React.FormEvent) => {
+  const handleCreateEmpresaMaster = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingEmpresa(true);
 
-    if (editingEmpresa) {
-      const { error } = await supabase.from('empresas').update({ nombre: nuevaEmpresaNombre }).eq('id', editingEmpresa.id);
+    const { data: empData, error: empError } = await supabase
+      .from('empresas')
+      .insert([{ nombre: nuevaEmpresaNombre }])
+      .select()
+      .single();
+
+    if (empError || !empData) {
+      alert('Error al crear empresa: ' + (empError?.message || 'Desconocido'));
       setSavingEmpresa(false);
-      if (!error) {
-        alert('Negocio actualizado con éxito');
-        setEditingEmpresa(null);
-        setNuevaEmpresaNombre('');
-        fetchEmpresas();
-      } else {
-        alert('Error al actualizar negocio: ' + error.message);
-      }
-    } else {
-      const { data: empData, error: empError } = await supabase
-        .from('empresas')
-        .insert([{ nombre: nuevaEmpresaNombre }])
-        .select()
-        .single();
+      return;
+    }
 
-      if (empError || !empData) {
-        alert('Error al crear empresa: ' + (empError?.message || 'Desconocido'));
-        setSavingEmpresa(false);
-        return;
-      }
-
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: adminEmpresaEmail,
-        password: adminEmpresaPass,
-        options: {
-          data: {
-            full_name: adminEmpresaNombre,
-            role: 'administrador',
-            empresa_id: empData.id
-          }
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: adminEmpresaEmail,
+      password: adminEmpresaPass,
+      options: {
+        data: {
+          full_name: adminEmpresaNombre,
+          role: 'administrador',
+          empresa_id: empData.id
         }
-      });
-
-      setSavingEmpresa(false);
-      if (!signUpError) {
-        alert('¡Negocio y Administrador creados con éxito!');
-        setNuevaEmpresaNombre('');
-        setAdminEmpresaEmail('');
-        setAdminEmpresaPass('');
-        setAdminEmpresaNombre('');
-        fetchEmpresas();
-      } else {
-        alert('Empresa creada, pero error al crear usuario admin: ' + signUpError.message);
       }
+    });
+
+    setSavingEmpresa(false);
+    if (!signUpError) {
+      alert('¡Negocio y Administrador creados con éxito!');
+      setNuevaEmpresaNombre('');
+      setAdminEmpresaEmail('');
+      setAdminEmpresaPass('');
+      setAdminEmpresaNombre('');
+      fetchEmpresas();
+    } else {
+      alert('Empresa creada, pero error al crear usuario admin: ' + signUpError.message);
+    }
+  };
+
+  const handleUpdateEmpresaMaster = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEmpresa) return;
+    setSavingEmpresa(true);
+
+    const { error } = await supabase.from('empresas').update({
+      nombre: editNombre,
+      telefono: editTelefono,
+      direccion: editDireccion,
+      logo_url: editLogoUrl
+    }).eq('id', editingEmpresa.id);
+
+    setSavingEmpresa(false);
+    if (!error) {
+      alert('Negocio actualizado con éxito');
+      setEditingEmpresa(null);
+      fetchEmpresas();
+    } else {
+      alert('Error al actualizar negocio: ' + error.message);
     }
   };
 
@@ -660,19 +675,6 @@ export default function CRMPage() {
     return `https://wa.me/${phone}?text=${encodeURIComponent(customizedMessage)}`;
   };
 
-  const totalLeadsCount = dirige.length;
-  const totalCitasCount = equipoCitas.length;
-  const totalSociosCount = socios.length;
-  const conversionRate = totalLeadsCount > 0 ? Math.round((totalSociosCount / totalLeadsCount) * 100) : 0;
-  const failureRate = 100 - conversionRate;
-
-  const statusCounts = statuses.map((st) => {
-    const count = dirige.filter((l) => (l.status || 'NUEVO/ SIN CONTACTAR') === st).length;
-    const percentage = totalLeadsCount > 0 ? Math.round((count / totalLeadsCount) * 100) : 0;
-    return { status: st, count, percentage };
-  });
-
-  // Imagen de Logo activa (prioriza la subida por el usuario o usa /logo.png por defecto)
   const activeLogoSrc = empresaActualLogo || '/logo.png';
 
   if (authLoading) {
@@ -753,7 +755,6 @@ export default function CRMPage() {
           </button>
           
           <div className="flex items-center space-x-2.5">
-            {/* LOGO CIRCULAR DINÁMICO */}
             <div className="w-9 h-9 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-full overflow-hidden p-0.5 shadow-sm">
               <img src={activeLogoSrc} alt="Logo CRM" className="w-full h-full object-contain rounded-full" />
             </div>
@@ -848,13 +849,13 @@ export default function CRMPage() {
       {/* CONTENIDO PRINCIPAL */}
       <main className="flex-1 overflow-y-auto pb-24 p-4 max-w-4xl mx-auto w-full">
         
-        {/* PANEL CONFIGURACIÓN LOGO (ADMIN DE EMPRESA) */}
+        {/* PANEL CONFIGURACIÓN LOGO */}
         {userProfile?.role !== 'superadmin' && currentTab === 'configuracion' && (
           <div className="space-y-4">
             <h2 className="text-base font-bold text-white mb-2">Configuración de Identidad y Logo</h2>
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-lg">
               <p className="text-xs text-gray-300">
-                Puedes cambiar el enlace de tu logotipo corporativo para que aparezca en todo tu panel de CRM. Usa una URL de imagen pública (por ejemplo, alojada en Imgur, Supabase Storage o tu servidor).
+                Cambia el enlace de tu logotipo corporativo para actualizarlo de forma dinámica en todo tu CRM.
               </p>
               
               <div className="flex items-center space-x-4 py-3">
@@ -863,7 +864,7 @@ export default function CRMPage() {
                 </div>
                 <div>
                   <p className="text-xs font-bold text-white">Vista previa del logo actual</p>
-                  <p className="text-[10px] text-gray-400">Se adapta perfectamente de manera circular</p>
+                  <p className="text-[10px] text-gray-400">Se adapta de manera circular corporativa</p>
                 </div>
               </div>
 
@@ -894,55 +895,92 @@ export default function CRMPage() {
         {/* PANEL SUPERADMIN */}
         {userProfile?.role === 'superadmin' && (
           <div className="space-y-6">
+            
+            {/* FORMULARIO EDITAR O CREAR NEGOCIO */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
               <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>🏢</span> <span>{editingEmpresa ? 'Editar Negocio' : 'Crear Nuevo Negocio (Gimnasio / Local)'}</span>
+                <span>🏢</span> <span>{editingEmpresa ? 'Editar Negocio Dinámico' : 'Crear Nuevo Negocio'}</span>
               </h2>
-              <form onSubmit={handleCreateOrUpdateEmpresaMaster} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1">Nombre del Negocio</label>
-                  <input type="text" required placeholder="Ej. Gimnasio Titan / Mard's Comida" value={nuevaEmpresaNombre} onChange={e => setNuevaEmpresaNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
-                </div>
-                {!editingEmpresa && (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-300 mb-1">Nombre del Administrador</label>
-                        <input type="text" required placeholder="Nombre del Dueño" value={adminEmpresaNombre} onChange={e => setAdminEmpresaNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-300 mb-1">Correo de Acceso Admin</label>
-                        <input type="email" required placeholder="admin@negocio.com" value={adminEmpresaEmail} onChange={e => setAdminEmpresaEmail(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
-                      </div>
+
+              {editingEmpresa ? (
+                <form onSubmit={handleUpdateEmpresaMaster} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Nombre del Negocio</label>
+                    <input type="text" required value={editNombre} onChange={e => setEditNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Número de Teléfono (WhatsApp de contacto)</label>
+                    <input type="text" placeholder="Ej. 5493854123456" value={editTelefono} onChange={e => setEditTelefono(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Dirección del Local</label>
+                    <input type="text" placeholder="Ej. Av 25 de Mayo 705" value={editDireccion} onChange={e => setEditDireccion(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">URL del Logotipo</label>
+                    <input type="url" placeholder="https://ejemplo.com/logo.png" value={editLogoUrl} onChange={e => setEditLogoUrl(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                  </div>
+                  <div className="flex space-x-2 pt-2">
+                    <button type="button" onClick={() => setEditingEmpresa(null)} className="flex-1 py-2.5 bg-slate-800 text-gray-300 rounded-xl text-xs font-bold">Cancelar</button>
+                    <button type="submit" disabled={savingEmpresa} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition">
+                      {savingEmpresa ? 'Guardando...' : 'Guardar Cambios'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleCreateEmpresaMaster} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Nombre del Negocio</label>
+                    <input type="text" required placeholder="Ej. Gimnasio Titan / Mard's" value={nuevaEmpresaNombre} onChange={e => setNuevaEmpresaNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-300 mb-1">Nombre del Administrador</label>
+                      <input type="text" required placeholder="Nombre del Dueño" value={adminEmpresaNombre} onChange={e => setAdminEmpresaNombre(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-300 mb-1">Contraseña del Administrador</label>
-                      <input type="password" required placeholder="••••••••" value={adminEmpresaPass} onChange={e => setAdminEmpresaPass(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                      <label className="block text-xs font-bold text-gray-300 mb-1">Correo de Acceso Admin</label>
+                      <input type="email" required placeholder="admin@negocio.com" value={adminEmpresaEmail} onChange={e => setAdminEmpresaEmail(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
                     </div>
-                  </>
-                )}
-                <div className="flex space-x-2">
-                  {editingEmpresa && (
-                    <button type="button" onClick={() => { setEditingEmpresa(null); setNuevaEmpresaNombre(''); }} className="flex-1 py-2.5 bg-slate-800 text-gray-300 rounded-xl text-xs font-bold">Cancelar</button>
-                  )}
-                  <button type="submit" disabled={savingEmpresa} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow">
-                    {savingEmpresa ? 'Guardando...' : editingEmpresa ? 'Actualizar Negocio' : 'Registrar Negocio y Crear Cuenta Admin'}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-300 mb-1">Contraseña del Administrador</label>
+                    <input type="password" required placeholder="••••••••" value={adminEmpresaPass} onChange={e => setAdminEmpresaPass(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white" />
+                  </div>
+                  <button type="submit" disabled={savingEmpresa} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow">
+                    {savingEmpresa ? 'Creando Empresa...' : 'Registrar Negocio y Cuenta Admin'}
                   </button>
-                </div>
-              </form>
+                </form>
+              )}
             </div>
 
+            {/* LISTA DE NEGOCIOS REGISTRADOS */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
               <h3 className="font-bold text-sm text-white">Negocios Registrados ({empresas.length})</h3>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {empresas.map((emp) => (
-                  <div key={emp.id} className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl flex justify-between items-center">
-                    <div>
-                      <h4 className="font-bold text-white text-sm">{emp.nombre}</h4>
-                      <p className="text-[11px] text-gray-400 font-mono">ID: {emp.id}</p>
+                  <div key={emp.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-7 h-7 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-full overflow-hidden p-0.5">
+                          <img src={emp.logo_url || '/logo.png'} alt="Logo" className="w-full h-full object-contain rounded-full" />
+                        </div>
+                        <h4 className="font-bold text-white text-sm">{emp.nombre}</h4>
+                      </div>
+                      <p className="text-[11px] text-gray-400">📞 Tel: {emp.telefono || 'No configurado'} • 📍 Dir: {emp.direccion || 'No especificada'}</p>
+                      <p className="text-[10px] text-gray-500 font-mono">ID: {emp.id}</p>
                     </div>
-                    <div className="flex space-x-2">
-                      <button onClick={() => { setEditingEmpresa(emp); setNuevaEmpresaNombre(emp.nombre); }} className="px-2.5 py-1 bg-slate-800 text-gray-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-slate-700">Editar</button>
+                    <div className="flex space-x-2 w-full sm:w-auto justify-end">
+                      {emp.telefono && (
+                        <a href={`https://wa.me/${emp.telefono}?text=Hola%20${encodeURIComponent(emp.nombre)}`} target="_blank" rel="noreferrer" className="px-3 py-1 bg-green-900/40 text-green-400 border border-green-700/50 rounded-lg text-xs font-bold">WhatsApp</a>
+                      )}
+                      <button onClick={() => { 
+                        setEditingEmpresa(emp); 
+                        setEditNombre(emp.nombre || ''); 
+                        setEditTelefono(emp.telefono || ''); 
+                        setEditDireccion(emp.direccion || ''); 
+                        setEditLogoUrl(emp.logo_url || ''); 
+                      }} className="px-2.5 py-1 bg-slate-800 text-gray-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-slate-700">Editar</button>
                       <button onClick={() => handleDeleteEmpresa(emp.id)} className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-600/40 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white">Eliminar</button>
                     </div>
                   </div>
