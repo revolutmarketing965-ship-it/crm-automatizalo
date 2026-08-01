@@ -191,6 +191,7 @@ export default function CRMPage() {
     await supabase.auth.signOut();
   };
 
+  // CONSULTAS SINCRONIZADAS ESTRICTAMENTE AL EMPRESA_ID
   const fetchDirige = async () => {
     setLoadingLeads(true);
     let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
@@ -295,21 +296,23 @@ export default function CRMPage() {
       return;
     }
 
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: adminEmpresaEmail,
       password: adminEmpresaPass,
-      options: {
-        data: {
-          full_name: adminEmpresaNombre,
-          role: 'administrador',
-          empresa_id: empData.id
-        }
-      }
     });
+
+    if (!signUpError && signUpData.user) {
+      await supabase.from('profiles').upsert([{
+        id: signUpData.user.id,
+        full_name: adminEmpresaNombre,
+        role: 'administrador',
+        empresa_id: empData.id
+      }]);
+    }
 
     setSavingEmpresa(false);
     if (!signUpError) {
-      alert('¡Negocio y Administrador creados con éxito!');
+      alert('¡Negocio y Administrador creados y sincronizados con éxito!');
       setNuevaEmpresaNombre('');
       setAdminEmpresaEmail('');
       setAdminEmpresaPass('');
@@ -672,19 +675,22 @@ export default function CRMPage() {
         alert('Error al actualizar usuario: ' + error.message);
       }
     } else {
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: nuevoEmail,
         password: nuevoPassword,
-        options: { 
-          data: { 
-            full_name: nuevoNombre, 
-            role: nuevoRol,
-            empresa_id: empresaId 
-          } 
-        }
       });
+
+      if (!signUpError && signUpData.user) {
+        await supabase.from('profiles').upsert([{
+          id: signUpData.user.id,
+          full_name: nuevoNombre,
+          role: nuevoRol,
+          empresa_id: empresaId
+        }]);
+      }
+
       setSavingUser(false);
-      if (!error) {
+      if (!signUpError) {
         alert('Vendedor creado con éxito');
         setNuevoNombre('');
         setNuevoEmail('');
@@ -693,7 +699,7 @@ export default function CRMPage() {
         setIsUserModalOpen(false);
         fetchTeam();
       } else {
-        alert('Error al crear usuario: ' + error.message);
+        alert('Error al crear usuario: ' + signUpError.message);
       }
     }
   };
@@ -916,7 +922,6 @@ export default function CRMPage() {
       {/* CONTENIDO PRINCIPAL */}
       <main className="flex-1 overflow-y-auto pb-24 p-4 max-w-5xl mx-auto w-full">
         
-        {/* VISTA SUPERADMIN: LEADS DE TODOS LOS NEGOCIOS */}
         {userProfile?.role === 'superadmin' && currentTab === 'superadminLeads' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
@@ -979,7 +984,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* CONFIGURACIÓN GLOBAL (SOLO SUPERADMIN) */}
         {userProfile?.role === 'superadmin' && currentTab === 'configGlobal' && (
           <div className="space-y-4">
             <h2 className="text-base font-bold text-white mb-2">Configuración Global de la Aplicación</h2>
@@ -1011,7 +1015,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* PANEL SUPERADMIN */}
         {userProfile?.role === 'superadmin' && currentTab === 'superadmin' && (
           <div className="space-y-6">
             {editingEmpresa ? (
@@ -1124,7 +1127,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* TAB DIRIGE / LEADS */}
         {userProfile?.role !== 'superadmin' && currentTab === 'dirige' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -1231,7 +1233,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* TAB CITAS */}
         {userProfile?.role !== 'superadmin' && currentTab === 'citas' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -1274,7 +1275,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* TAB SOCIOS / CLIENTES */}
         {userProfile?.role !== 'superadmin' && currentTab === 'socios' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -1363,7 +1363,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* TAB PLANES / MEMBRESIAS */}
         {userProfile?.role !== 'superadmin' && currentTab === 'membresias' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -1394,7 +1393,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* TAB METRICAS */}
         {userProfile?.role !== 'superadmin' && currentTab === 'metricas' && (
           <div className="space-y-5">
             <h2 className="text-base font-bold text-white mb-2">Métricas de Conversión y Rendimiento</h2>
@@ -1436,7 +1434,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* TAB MENSAJES */}
         {userProfile?.role !== 'superadmin' && currentTab === 'mensajes' && (
           <div className="space-y-4">
             <h2 className="text-base font-bold text-white mb-2">Plantilla de WhatsApp Automática</h2>
@@ -1449,7 +1446,6 @@ export default function CRMPage() {
           </div>
         )}
 
-        {/* TAB EQUIPO / VENDEDORES */}
         {userProfile?.role !== 'superadmin' && currentTab === 'equipo' && (
           <div className="space-y-3">
             <div className="flex justify-between items-center mb-2">
@@ -1481,7 +1477,6 @@ export default function CRMPage() {
 
       </main>
 
-      {/* FAB BOTON NUEVO LEAD */}
       {userProfile?.role !== 'superadmin' && (
         <button onClick={() => { setEditingLead(null); setNombre(''); setTelefono(''); setCorreo(''); setOrigen('Facebook Ads'); setLeadStatus('NUEVO/ SIN CONTACTAR'); setNotasLead(''); setIsLeadModalOpen(true); }} className="fixed right-5 bottom-20 md:bottom-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg z-30 transition transform active:scale-95">
           <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
