@@ -135,7 +135,7 @@ export default function CRMPage() {
   const fetchUserProfile = async (userId: string) => {
     let { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (!data) {
-      const defaultProfile = { id: userId, full_name: 'Administrador', role: 'superadmin' };
+      const defaultProfile = { id: userId, full_name: 'Administrador', role: 'superadmin', empresa_id: '11111111-1111-1111-1111-111111111111' };
       await supabase.from('profiles').upsert([defaultProfile]);
       data = defaultProfile;
     }
@@ -244,7 +244,7 @@ export default function CRMPage() {
   };
 
   useEffect(() => {
-    if (session && userProfile && userProfile.role !== 'superadmin') {
+    if (session && userProfile) {
       fetchDirige();
       fetchCitas();
       fetchSocios();
@@ -264,7 +264,7 @@ export default function CRMPage() {
         if (targetField === 'global') {
           setGlobalLogo(base64String);
           localStorage.setItem('global_app_logo', base64String);
-          alert('¡Logo global actualizado para toda la aplicación!');
+          alert('¡Logo global actualizado!');
         }
       };
       reader.readAsDataURL(file);
@@ -330,7 +330,7 @@ export default function CRMPage() {
   const handleCreateOrUpdateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingLead(true);
-    const empresaId = userProfile?.empresa_id || null;
+    const empresaId = userProfile?.empresa_id || '11111111-1111-1111-1111-111111111111';
 
     if (editingLead) {
       const { error } = await supabase.from('leads').update({
@@ -342,8 +342,7 @@ export default function CRMPage() {
         setIsLeadModalOpen(false); fetchDirige();
       } else alert('Error al actualizar lead: ' + error.message);
     } else {
-      const payload: any = { full_name: nombre, name: nombre, phone: telefono, email: correo || null, origin, status: leadStatus, notes: notasLead || null };
-      if (empresaId) payload.empresa_id = empresaId;
+      const payload: any = { full_name: nombre, name: nombre, phone: telefono, email: correo || null, origin, status: leadStatus, notes: notasLead || null, empresa_id: empresaId };
       const { error } = await supabase.from('leads').insert([payload]);
       setSavingLead(false);
       if (!error) {
@@ -364,14 +363,13 @@ export default function CRMPage() {
     const targetLeadId = selectedLeadId || editingCita?.lead_id;
     if (!targetLeadId) { alert('Selecciona un lead válido'); return; }
     setSavingCita(true);
-    const empresaId = userProfile?.empresa_id || null;
+    const empresaId = userProfile?.empresa_id || '11111111-1111-1111-1111-111111111111';
     const formattedDate = fechaCita || new Date().toISOString().split('T')[0];
     const formattedTime = horaCita || '00:00';
     const payload: any = {
       lead_id: targetLeadId, appointment_date: formattedDate, appointment_time: formattedTime,
-      scheduled_at: new Date(`${formattedDate}T${formattedTime}:00`).toISOString(), notes: notasCita || null
+      scheduled_at: new Date(`${formattedDate}T${formattedTime}:00`).toISOString(), notes: notasCita || null, empresa_id: empresaId
     };
-    if (empresaId) payload.empresa_id = empresaId;
 
     if (editingCita) {
       const { error } = await supabase.from('appointments').update(payload).eq('id', editingCita.id);
@@ -392,10 +390,9 @@ export default function CRMPage() {
 
   const handleConvertLeadToSocio = async (leadId: string) => {
     if (!leadId) return;
-    const empresaId = userProfile?.empresa_id || null;
+    const empresaId = userProfile?.empresa_id || '11111111-1111-1111-1111-111111111111';
     const defaultMembresiaId = membresias[0]?.id || null;
-    const payload: any = { lead_id: leadId, membresia_id: defaultMembresiaId, payment_status: 'Pagado', notes: 'Convertido desde CRM' };
-    if (empresaId) payload.empresa_id = empresaId;
+    const payload: any = { lead_id: leadId, membresia_id: defaultMembresiaId, payment_status: 'Pagado', notes: 'Convertido desde CRM', empresa_id: empresaId };
 
     const { error } = await supabase.from('socios').insert([payload]);
     if (!error) {
@@ -407,9 +404,8 @@ export default function CRMPage() {
   const handleCreateOrUpdateSocio = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingSocio(true);
-    const empresaId = userProfile?.empresa_id || null;
-    const payload: any = { lead_id: selectedSocioLeadId || editingSocio?.lead_id, membresia_id: selectedMembresiaId || null, payment_status: paymentStatus, notes: notasSocio || null };
-    if (empresaId) payload.empresa_id = empresaId;
+    const empresaId = userProfile?.empresa_id || '11111111-1111-1111-1111-111111111111';
+    const payload: any = { lead_id: selectedSocioLeadId || editingSocio?.lead_id, membresia_id: selectedMembresiaId || null, payment_status: paymentStatus, notes: notasSocio || null, empresa_id: empresaId };
 
     if (editingSocio) {
       const { error } = await supabase.from('socios').update(payload).eq('id', editingSocio.id);
@@ -431,9 +427,8 @@ export default function CRMPage() {
   const handleCreateOrUpdateMembresia = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingMembresia(true);
-    const empresaId = userProfile?.empresa_id || null;
-    const payload: any = { nombre: nombreMembresia, secciones: seccionesMembresia || null, precio: precioMembresia ? parseFloat(precioMembresia) : 0 };
-    if (empresaId) payload.empresa_id = empresaId;
+    const empresaId = userProfile?.empresa_id || '11111111-1111-1111-1111-111111111111';
+    const payload: any = { nombre: nombreMembresia, secciones: seccionesMembresia || null, precio: precioMembresia ? parseFloat(precioMembresia) : 0, empresa_id: empresaId };
 
     if (editingMembresia) {
       const { error } = await supabase.from('membresias').update(payload).eq('id', editingMembresia.id);
@@ -471,7 +466,7 @@ export default function CRMPage() {
   const handleCreateOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingUser(true);
-    const empresaId = userProfile?.empresa_id || null;
+    const empresaId = userProfile?.empresa_id || '11111111-1111-1111-1111-111111111111';
 
     if (editingUser) {
       const { error } = await supabase.from('profiles').update({ full_name: nuevoNombre, role: nuevoRol }).eq('id', editingUser.id);
@@ -618,7 +613,7 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* CONTENIDO PRINCIPAL COMPLETO Y EXTENDIDO */}
+      {/* CONTENIDO PRINCIPAL */}
       <main className="flex-1 overflow-y-auto pb-24 p-4 max-w-5xl mx-auto w-full">
         {userProfile?.role === 'superadmin' && currentTab === 'superadminLeads' && (
           <div className="space-y-4">
