@@ -30,15 +30,17 @@ export default function CRMPage() {
   
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [allLeadsSuperadmin, setAllLeadsSuperadmin] = useState<any[]>([]);
-  const [selectedEmpresaLeadsId, setSelectedEmpresaLeadsId] = useState<string>('todos');
+  const [, setSelectedEmpresaLeadsId] = useState<string>('todos');
   
-  // Estados para creación de negocios (sin conflictos de logos)
+  // Estados para la creación de empresas con archivo de logo desde PC
   const [nuevaEmpresaNombre, setNuevaEmpresaNombre] = useState('');
   const [adminEmpresaEmail, setAdminEmpresaEmail] = useState('');
   const [adminEmpresaPass, setAdminEmpresaPass] = useState('');
   const [adminEmpresaNombre, setAdminEmpresaNombre] = useState('');
   const [nuevoTelefono, setNuevoTelefono] = useState('');
   const [nuevaDireccion, setNuevaDireccion] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Estados de carga y modales de soporte
   const [loadingLeads, setLoadingLeads] = useState(false);
@@ -211,10 +213,31 @@ export default function CRMPage() {
     alert(`Convertir lead ${leadId} a cliente activo.`);
   };
 
-  // Función limpia para crear negocio sin conflicto de logos gigantes
+  // Función robusta para subir el logo desde la PC al Storage de Supabase y guardar la URL pública
   const handleCrearNegocio = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUploadingLogo(true);
     try {
+      let logoUrlFinal = '/logo.png'; // Valor por defecto si no se selecciona archivo
+
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `logos/${fileName}`;
+
+        // Sube la imagen al bucket 'empresas' o el que uses en tu Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('logos') // Asegúrate de tener un bucket llamado 'logos' en tu Supabase Storage
+          .upload(filePath, logoFile);
+
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('logos')
+            .getPublicUrl(filePath);
+          logoUrlFinal = publicUrl;
+        }
+      }
+
       const { data: empresaData, error: empresaError } = await supabase
         .from('empresas')
         .insert([
@@ -222,7 +245,7 @@ export default function CRMPage() {
             nombre: nuevaEmpresaNombre,
             telefono: nuevoTelefono,
             direccion: nuevaDireccion || 'Dirección Principal',
-            logo_url: '/logo.png' // URL limpia por defecto
+            logo_url: logoUrlFinal // URL pública real y limpia
           }
         ])
         .select()
@@ -230,13 +253,34 @@ export default function CRMPage() {
 
       if (empresaError) throw empresaError;
 
-      alert('¡Negocio creado exitosamente!');
+      if (adminEmpresaEmail && adminEmpresaPass) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: adminEmpresaEmail,
+          password: adminEmpresaPass,
+          options: {
+            data: {
+              full_name: adminEmpresaNombre || 'Administrador',
+              role: 'admin',
+              empresa_id: empresaData.id
+            }
+          }
+        });
+        if (signUpError) throw signUpError;
+      }
+
+      alert('¡Negocio y cuenta de administrador creados con éxito!');
       setNuevaEmpresaNombre('');
+      setAdminEmpresaEmail('');
+      setAdminEmpresaPass('');
+      setAdminEmpresaNombre('');
       setNuevoTelefono('');
       setNuevaDireccion('');
+      setLogoFile(null);
       fetchAllSuperadminData();
     } catch (error: any) {
-      alert('Error al crear negocio: ' + error.message);
+      alert('Error al registrar negocio: ' + error.message);
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
@@ -288,7 +332,7 @@ export default function CRMPage() {
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Barra superior con opciones de sesión */}
+        {/* Barra superior y perfil */}
         <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl">
           <div className="flex items-center space-x-3">
             <span className="text-xs font-bold px-2.5 py-1 bg-blue-950 text-blue-300 border border-blue-800 rounded-lg">
@@ -300,76 +344,95 @@ export default function CRMPage() {
           </button>
         </div>
 
-        {/* Panel para Superadmin */}
+        {/* Panel Maestro Superadmin */}
         {userProfile?.role === 'superadmin' && (
           <div className="space-y-6">
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <h3 className="text-base font-bold text-white">Crear Nuevo Negocio (Local)</h3>
-              <form onSubmit={handleCrearNegocio} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <input 
-                  type="text" 
-                  placeholder="Nombre del Negocio" 
-                  value={nuevaEmpresaNombre} 
-                  onChange={(e) => setNuevaEmpresaNombre(e.target.value)} 
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none"
-                  required 
-                />
-                <input 
-                  type="text" 
-                  placeholder="Teléfono" 
-                  value={nuevoTelefono} 
-                  onChange={(e) => setNuevoTelefono(e.target.value)} 
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none"
-                />
-                <input 
-                  type="text" 
-                  placeholder="Dirección del Local" 
-                  value={nuevaDireccion} 
-                  onChange={(e) => setNuevaDireccion(e.target.value)} 
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none sm:col-span-2"
-                />
-                <button type="submit" className="sm:col-span-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2.5 rounded-xl transition-all">
-                  Registrar Negocio
-                </button>
-              </form>
+            <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-4">
+              <button onClick={() => setCurrentTab('superadmin')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'superadmin' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Negocios</button>
+              <button onClick={() => setCurrentTab('superadminLeads')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'superadminLeads' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Todos los Leads</button>
+              <button onClick={() => setCurrentTab('metricas')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'metricas' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Métricas Globales</button>
+              <button onClick={() => setCurrentTab('configGlobal')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'configGlobal' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Configuración</button>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <h3 className="text-base font-bold text-white">Negocios Registrados ({empresas.length})</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {empresas.map((emp) => (
-                  <div key={emp.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2">
-                    <h4 className="font-bold text-white text-sm">{emp.nombre}</h4>
-                    <p className="text-xs text-gray-400">📞 {emp.telefono || 'Sin teléfono'} • 📍 {emp.direccion || 'Sin dirección'}</p>
+            {currentTab === 'superadmin' && (
+              <div className="space-y-6">
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                  <h3 className="text-base font-bold text-white">Crear Nuevo Negocio y Cuenta Admin</h3>
+                  <form onSubmit={handleCrearNegocio} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input type="text" placeholder="Nombre del Negocio" value={nuevaEmpresaNombre} onChange={(e) => setNuevaEmpresaNombre(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" required />
+                    <input type="text" placeholder="Nombre del Administrador" value={adminEmpresaNombre} onChange={(e) => setAdminEmpresaNombre(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" required />
+                    <input type="email" placeholder="Correo de Acceso Admin" value={adminEmpresaEmail} onChange={(e) => setAdminEmpresaEmail(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" required />
+                    <input type="password" placeholder="Contraseña del Administrador" value={adminEmpresaPass} onChange={(e) => setAdminEmpresaPass(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" required />
+                    <input type="text" placeholder="Número de Teléfono" value={nuevoTelefono} onChange={(e) => setNuevoTelefono(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" />
+                    <input type="text" placeholder="Dirección del Local" value={nuevaDireccion} onChange={(e) => setNuevaDireccion(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" />
+                    
+                    {/* Selector de Logo desde PC */}
+                    <div className="sm:col-span-2 space-y-1">
+                      <label className="text-xs text-gray-400 font-bold block">Logotipo del Negocio (Desde PC)</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => setLogoFile(e.target.files?.[0] || null)} 
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer" 
+                      />
+                    </div>
+
+                    <button type="submit" disabled={uploadingLogo} className="sm:col-span-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2.5 rounded-xl transition-all disabled:opacity-50">
+                      {uploadingLogo ? 'Subiendo imagen y registrando...' : 'Registrar Negocio y Crear Cuenta Admin'}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                  <h3 className="text-base font-bold text-white">Negocios Registrados ({empresas.length})</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {empresas.map((emp) => (
+                      <div key={emp.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2 flex items-center space-x-3">
+                        {emp.logo_url && <img src={emp.logo_url} alt="Logo" className="w-10 h-10 object-contain rounded-lg bg-slate-900 p-1 border border-slate-800" />}
+                        <div>
+                          <h4 className="font-bold text-white text-sm">{emp.nombre}</h4>
+                          <p className="text-xs text-gray-400">📞 {emp.telefono || 'Sin teléfono'} • 📍 {emp.direccion || 'Sin dirección'}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {currentTab === 'superadminLeads' && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <h3 className="text-base font-bold text-white">Todos los Leads del Sistema ({allLeadsSuperadmin.length})</h3>
+                <p className="text-xs text-gray-400">Vista consolidada de prospectos de todas las sucursales y negocios.</p>
+              </div>
+            )}
+
+            {currentTab === 'metricas' && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <h3 className="text-base font-bold text-white">Métricas Globales</h3>
+                <p className="text-xs text-gray-400">Resumen y estadísticas generales del sistema de negocios.</p>
+              </div>
+            )}
+
+            {currentTab === 'configGlobal' && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <h3 className="text-base font-bold text-white">Configuración Global</h3>
+                <p className="text-xs text-gray-400">Ajustes generales de la plataforma y accesos.</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Panel para usuarios normales (Modularizado) */}
+        {/* Panel para usuarios normales / vendedores */}
         {userProfile?.role !== 'superadmin' && (
           <>
             <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-4">
-              <button 
-                onClick={() => setCurrentTab('dirige')} 
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'dirige' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}
-              >
-                Leads / Prospectos
-              </button>
-              <button 
-                onClick={() => setCurrentTab('citas')} 
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'citas' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}
-              >
-                Citas Agendadas
-              </button>
-              <button 
-                onClick={() => setCurrentTab('socios')} 
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'socios' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}
-              >
-                Clientes / Socios
-              </button>
+              <button onClick={() => setCurrentTab('dirige')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'dirige' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Leads / Prospectos</button>
+              <button onClick={() => setCurrentTab('citas')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'citas' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Citas Agendadas</button>
+              <button onClick={() => setCurrentTab('socios')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'socios' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Clientes / Socios</button>
+              <button onClick={() => setCurrentTab('membresias')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'membresias' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Membresías</button>
+              <button onClick={() => setCurrentTab('equipo')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'equipo' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Equipo</button>
+              <button onClick={() => setCurrentTab('mensajes')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${currentTab === 'mensajes' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-400'}`}>Mensajes</button>
             </div>
 
             {currentTab === 'dirige' && (
@@ -409,6 +472,27 @@ export default function CRMPage() {
                 onDeleteSocio={handleDeleteSocio}
                 getWhatsAppLink={getWhatsAppLink}
               />
+            )}
+
+            {currentTab === 'membresias' && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <h3 className="text-base font-bold text-white mb-2">Gestión de Membresías</h3>
+                <p className="text-xs text-gray-400">Control de planes y suscripciones activas.</p>
+              </div>
+            )}
+
+            {currentTab === 'equipo' && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <h3 className="text-base font-bold text-white mb-2">Equipo de Trabajo</h3>
+                <p className="text-xs text-gray-400">Vendedores y usuarios vinculados a este local.</p>
+              </div>
+            )}
+
+            {currentTab === 'mensajes' && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <h3 className="text-base font-bold text-white mb-2">Automatización de Mensajes</h3>
+                <p className="text-xs text-gray-400">Plantillas y disparadores de WhatsApp.</p>
+              </div>
             )}
           </>
         )}
