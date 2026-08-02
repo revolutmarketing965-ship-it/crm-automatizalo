@@ -20,27 +20,24 @@ export default function CRMPage() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [currentTab, setCurrentTab] = useState<'dirige' | 'citas' | 'socios' | 'membresias' | 'equipo' | 'metricas' | 'mensajes' | 'superadmin' | 'configGlobal' | 'superadminLeads'>('dirige');
   const [activeView, setActiveView] = useState<'lista' | 'tarjetas' | 'kanban'>('lista');
-  const [activeSociosView, setActiveSociosView] = useState<'lista' | 'tarjetas' | 'kanban'>('lista');
 
   const [dirige, setDirige] = useState<any[]>([]);
   const [equipoCitas, setEquipoCitas] = useState<any[]>([]);
   const [socios, setSocios] = useState<any[]>([]);
-  const [membresias, setMembresias] = useState<any[]>([]);
-  const [perfilesEquipo, setPerfilesEquipo] = useState<any[]>([]);
   
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [allLeadsSuperadmin, setAllLeadsSuperadmin] = useState<any[]>([]);
-  const [, setSelectedEmpresaLeadsId] = useState<string>('todos');
   
-  // Estados para la creación de empresas con archivo de logo desde PC
+  // Estados para la creación limpia de negocios (sin botones molestos de archivo)
   const [nuevaEmpresaNombre, setNuevaEmpresaNombre] = useState('');
   const [adminEmpresaEmail, setAdminEmpresaEmail] = useState('');
   const [adminEmpresaPass, setAdminEmpresaPass] = useState('');
   const [adminEmpresaNombre, setAdminEmpresaNombre] = useState('');
   const [nuevoTelefono, setNuevoTelefono] = useState('');
   const [nuevaDireccion, setNuevaDireccion] = useState('');
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  // Estado para la configuración del logotipo maestro global
+  const [masterLogoUrl, setMasterLogoUrl] = useState('/logo.png');
 
   // Estados de carga y modales de soporte
   const [loadingLeads, setLoadingLeads] = useState(false);
@@ -213,31 +210,23 @@ export default function CRMPage() {
     alert(`Convertir lead ${leadId} a cliente activo.`);
   };
 
-  // Función robusta para subir el logo desde la PC al Storage de Supabase y guardar la URL pública
+  const handleDeleteEmpresa = async (id: string) => {
+    if (confirm('¿Estás seguro de eliminar este negocio? Se borrarán sus registros asociados.')) {
+      try {
+        const { error } = await supabase.from('empresas').delete().eq('id', id);
+        if (error) throw error;
+        setEmpresas(empresas.filter(emp => emp.id !== id));
+        alert('Negocio eliminado correctamente.');
+      } catch (error: any) {
+        alert('Error al eliminar negocio: ' + error.message);
+      }
+    }
+  };
+
+  // Función para crear negocio asignando automáticamente el logo maestro configurado
   const handleCrearNegocio = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUploadingLogo(true);
     try {
-      let logoUrlFinal = '/logo.png'; // Valor por defecto si no se selecciona archivo
-
-      if (logoFile) {
-        const fileExt = logoFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `logos/${fileName}`;
-
-        // Sube la imagen al bucket 'empresas' o el que uses en tu Supabase Storage
-        const { error: uploadError } = await supabase.storage
-          .from('logos') // Asegúrate de tener un bucket llamado 'logos' en tu Supabase Storage
-          .upload(filePath, logoFile);
-
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('logos')
-            .getPublicUrl(filePath);
-          logoUrlFinal = publicUrl;
-        }
-      }
-
       const { data: empresaData, error: empresaError } = await supabase
         .from('empresas')
         .insert([
@@ -245,7 +234,7 @@ export default function CRMPage() {
             nombre: nuevaEmpresaNombre,
             telefono: nuevoTelefono,
             direccion: nuevaDireccion || 'Dirección Principal',
-            logo_url: logoUrlFinal // URL pública real y limpia
+            logo_url: masterLogoUrl // Asigna automáticamente el logotipo maestro global
           }
         ])
         .select()
@@ -275,12 +264,9 @@ export default function CRMPage() {
       setAdminEmpresaNombre('');
       setNuevoTelefono('');
       setNuevaDireccion('');
-      setLogoFile(null);
       fetchAllSuperadminData();
     } catch (error: any) {
       alert('Error al registrar negocio: ' + error.message);
-    } finally {
-      setUploadingLogo(false);
     }
   };
 
@@ -332,7 +318,7 @@ export default function CRMPage() {
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Barra superior y perfil */}
+        {/* Barra superior */}
         <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl">
           <div className="flex items-center space-x-3">
             <span className="text-xs font-bold px-2.5 py-1 bg-blue-950 text-blue-300 border border-blue-800 rounded-lg">
@@ -344,7 +330,7 @@ export default function CRMPage() {
           </button>
         </div>
 
-        {/* Panel Maestro Superadmin */}
+        {/* Panel Maestro Superadmin con sus solapas */}
         {userProfile?.role === 'superadmin' && (
           <div className="space-y-6">
             <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-4">
@@ -364,34 +350,30 @@ export default function CRMPage() {
                     <input type="email" placeholder="Correo de Acceso Admin" value={adminEmpresaEmail} onChange={(e) => setAdminEmpresaEmail(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" required />
                     <input type="password" placeholder="Contraseña del Administrador" value={adminEmpresaPass} onChange={(e) => setAdminEmpresaPass(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" required />
                     <input type="text" placeholder="Número de Teléfono" value={nuevoTelefono} onChange={(e) => setNuevoTelefono(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" />
-                    <input type="text" placeholder="Dirección del Local" value={nuevaDireccion} onChange={(e) => setNuevaDireccion(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none" />
+                    <input type="text" placeholder="Dirección del Local" value={nuevaDireccion} onChange={(e) => setNuevaDireccion(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none sm:col-span-2" />
                     
-                    {/* Selector de Logo desde PC */}
-                    <div className="sm:col-span-2 space-y-1">
-                      <label className="text-xs text-gray-400 font-bold block">Logotipo del Negocio (Desde PC)</label>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={(e) => setLogoFile(e.target.files?.[0] || null)} 
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-gray-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer" 
-                      />
-                    </div>
-
-                    <button type="submit" disabled={uploadingLogo} className="sm:col-span-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2.5 rounded-xl transition-all disabled:opacity-50">
-                      {uploadingLogo ? 'Subiendo imagen y registrando...' : 'Registrar Negocio y Crear Cuenta Admin'}
+                    <button type="submit" className="sm:col-span-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2.5 rounded-xl transition-all">
+                      Registrar Negocio y Crear Cuenta Admin
                     </button>
                   </form>
                 </div>
 
+                {/* Negocios Registrados con acciones */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
                   <h3 className="text-base font-bold text-white">Negocios Registrados ({empresas.length})</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {empresas.map((emp) => (
-                      <div key={emp.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-2 flex items-center space-x-3">
-                        {emp.logo_url && <img src={emp.logo_url} alt="Logo" className="w-10 h-10 object-contain rounded-lg bg-slate-900 p-1 border border-slate-800" />}
-                        <div>
-                          <h4 className="font-bold text-white text-sm">{emp.nombre}</h4>
-                          <p className="text-xs text-gray-400">📞 {emp.telefono || 'Sin teléfono'} • 📍 {emp.direccion || 'Sin dirección'}</p>
+                      <div key={emp.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-3 flex flex-col justify-between">
+                        <div className="flex items-center space-x-3">
+                          <img src={emp.logo_url || '/logo.png'} alt="Logo" className="w-10 h-10 object-contain rounded-lg bg-slate-900 p-1 border border-slate-800" />
+                          <div>
+                            <h4 className="font-bold text-white text-sm">{emp.nombre}</h4>
+                            <p className="text-xs text-gray-400">📞 {emp.telefono || 'Sin teléfono'} • 📍 {emp.direccion || 'Sin dirección'}</p>
+                          </div>
+                        </div>
+                        <div className="flex justify-end space-x-2 pt-2 border-t border-slate-900">
+                          <button onClick={() => alert(`Editar empresa: ${emp.nombre}`)} className="px-3 py-1 bg-slate-800 text-gray-300 rounded-lg text-xs font-bold hover:bg-slate-700">Editar</button>
+                          <button onClick={() => handleDeleteEmpresa(emp.id)} className="px-3 py-1 bg-red-600/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-600/30">Eliminar</button>
                         </div>
                       </div>
                     ))}
@@ -414,10 +396,29 @@ export default function CRMPage() {
               </div>
             )}
 
+            {/* Solapa de Configuración Global / Maestro para gestionar la imagen maestra */}
             {currentTab === 'configGlobal' && (
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-                <h3 className="text-base font-bold text-white">Configuración Global</h3>
-                <p className="text-xs text-gray-400">Ajustes generales de la plataforma y accesos.</p>
+                <h3 className="text-base font-bold text-white">Configuración del Logotipo Maestro</h3>
+                <p className="text-xs text-gray-400">Establece la URL o ruta de la imagen que se asignará por defecto a todos los nuevos negocios registrados.</p>
+                <div className="space-y-3 max-w-md">
+                  <div>
+                    <label className="text-xs text-gray-400 font-bold block mb-1">URL o Ruta del Logotipo Maestro</label>
+                    <input 
+                      type="text" 
+                      value={masterLogoUrl} 
+                      onChange={(e) => setMasterLogoUrl(e.target.value)} 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-600" 
+                    />
+                  </div>
+                  <div className="flex items-center space-x-3 pt-2">
+                    <span className="text-xs text-gray-400 font-bold">Vista previa actual:</span>
+                    <img src={masterLogoUrl} alt="Logo Maestro" className="w-10 h-10 object-contain rounded-lg bg-slate-950 p-1 border border-slate-800" />
+                  </div>
+                  <button onClick={() => alert('¡Logotipo maestro actualizado para las próximas altas de negocios!')} className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">
+                    Guardar Cambios de Configuración
+                  </button>
+                </div>
               </div>
             )}
           </div>
