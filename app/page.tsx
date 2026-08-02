@@ -412,9 +412,9 @@ export default function CRMPage() {
         email: correo || null, 
         origin,
         status: leadStatus,
-        notes: notasLead || null
+        notes: notasLead || null,
+        empresa_id: empresaId
       };
-      if (empresaId) payload.empresa_id = empresaId;
 
       const { error } = await supabase.from('leads').insert([payload]);
       setSavingLead(false);
@@ -460,8 +460,8 @@ export default function CRMPage() {
       appointment_time: formattedTime,
       scheduled_at: isoScheduledAt,
       notes: notasCita || null,
+      empresa_id: empresaId
     };
-    if (empresaId) payload.empresa_id = empresaId;
 
     if (editingCita) {
       const { error } = await supabase.from('appointments').update(payload).eq('id', editingCita.id);
@@ -510,9 +510,9 @@ export default function CRMPage() {
       lead_id: leadId,
       membresia_id: defaultMembresiaId,
       payment_status: 'Pagado',
-      notes: 'Convertido directamente desde CRM'
+      notes: 'Convertido directamente desde CRM',
+      empresa_id: empresaId
     };
-    if (empresaId) payload.empresa_id = empresaId;
 
     const { error } = await supabase.from('socios').insert([payload]);
     if (!error) {
@@ -535,8 +535,8 @@ export default function CRMPage() {
       membresia_id: selectedMembresiaId || null,
       payment_status: paymentStatus,
       notes: notasSocio || null,
+      empresa_id: empresaId
     };
-    if (empresaId) payload.empresa_id = empresaId;
 
     if (editingSocio) {
       const { error } = await supabase.from('socios').update(payload).eq('id', editingSocio.id);
@@ -589,8 +589,8 @@ export default function CRMPage() {
       nombre: nombreMembresia,
       secciones: seccionesMembresia || null,
       precio: precioMembresia ? parseFloat(precioMembresia) : 0,
+      empresa_id: empresaId
     };
-    if (empresaId) payload.empresa_id = empresaId;
 
     if (editingMembresia) {
       const { error } = await supabase.from('membresias').update(payload).eq('id', editingMembresia.id);
