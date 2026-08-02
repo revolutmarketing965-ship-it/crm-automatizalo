@@ -260,7 +260,6 @@ export default function CRMPage() {
     }
   }, [session, userProfile]);
 
-  // Manejador limpio para actualizar la imagen del logotipo maestro global desde el panel de superadmin
   const handleGlobalLogoUpdate = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -275,17 +274,19 @@ export default function CRMPage() {
     }
   };
 
-  // Creación limpia de empresas sin botones de archivos pesados en el formulario principal
+  // Creación limpia con inserción correcta del email y ruta de logo ligera
   const handleCreateEmpresaMaster = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingEmpresa(true);
+    
     const { data: empData, error: empError } = await supabase
       .from('empresas')
       .insert([{ 
         nombre: nuevaEmpresaNombre, 
         telefono: nuevoTelefono, 
         direccion: nuevaDireccion, 
-        logo_url: globalLogo || '/logo.png' 
+        email: adminEmpresaEmail, // <-- Guarda correctamente el correo en la tabla
+        logo_url: '/logo.png'     // <-- Ruta limpia para evitar saturar con caracteres
       }])
       .select()
       .single();
@@ -1026,7 +1027,6 @@ export default function CRMPage() {
                 <h2 className="text-lg font-bold text-white flex items-center space-x-2">
                   <span>🏢</span> <span>Crear Nuevo Negocio (Gimnasio / Local)[cite: 1]</span>
                 </h2>
-                {/* Formulario limpio sin el botón duplicado de cargar archivo desde la PC en cada alta */}
                 <form onSubmit={handleCreateEmpresaMaster} className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-300 mb-1">Nombre del Negocio</label>
@@ -1074,7 +1074,7 @@ export default function CRMPage() {
                         </div>
                         <h4 className="font-bold text-white text-sm">{emp.nombre}</h4>
                       </div>
-                      <p className="text-[11px] text-gray-400">📞 Tel: {emp.telefono || 'No configurado'} • 📍 Dir: {emp.direccion || 'No especificada'}</p>
+                      <p className="text-[11px] text-gray-400">📞 Tel: {emp.telefono || 'No configurado'} • 📍 Dir: {emp.direccion || 'No especificada'} • ✉️ Email: {emp.email || 'No registrado'}</p>
                       <p className="text-[10px] text-gray-500 font-mono">ID: {emp.id}</p>
                     </div>
                     <div className="flex space-x-2 w-full sm:w-auto justify-end">
