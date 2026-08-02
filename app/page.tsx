@@ -243,6 +243,7 @@ export default function CRMPage() {
   const fetchTeam = async () => {
     setLoadingTeam(true);
     let query = supabase.from('profiles').select('*');
+    // CORRECCIÓN CLAVE: Filtrar estrictamente por la empresa del usuario actual si no es superadmin
     if (userProfile?.role !== 'superadmin' && userProfile?.empresa_id) {
       query = query.eq('empresa_id', userProfile.empresa_id);
     }
