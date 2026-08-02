@@ -7,6 +7,12 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// IDs OFICIALES DE TUS SUCURSALES CUMPA
+const SUCURSALES_CUMPA = {
+  SUCURSAL_1: 'eb23063e-c9c4-4d09-a698-b1698ed7a2b8',
+  SUCURSAL_2: 'f849426b-8186-4fba-9d0c-b96e9bcd0be4',
+};
+
 export default function CRMPage() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -274,7 +280,6 @@ export default function CRMPage() {
     }
   };
 
-  // Creación limpia con inserción correcta del email y ruta de logo ligera
   const handleCreateEmpresaMaster = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingEmpresa(true);
@@ -285,8 +290,8 @@ export default function CRMPage() {
         nombre: nuevaEmpresaNombre, 
         telefono: nuevoTelefono, 
         direccion: nuevaDireccion, 
-        email: adminEmpresaEmail, // <-- Guarda correctamente el correo en la tabla
-        logo_url: '/logo.png'     // <-- Ruta limpia para evitar saturar con caracteres
+        email: adminEmpresaEmail, 
+        logo_url: '/logo.png' 
       }])
       .select()
       .single();
@@ -438,6 +443,507 @@ export default function CRMPage() {
       alert('Por favor selecciona un lead válido');
       return;
     }
+    setSavingCita(true);
+    const empresaId = userProfile?.empresa_id || null;
+    if (editingCita) {
+      const { error } = await supabase.from('appointments').update({
+        lead_id: targetLeadId,
+        appointment_date: fechaCita,
+        appointment_time: horaCita,
+        notes: notasCita || null
+      }).eq('id', editingCita.id);
+      setSavingCita(false);
+      if (!error) {
+        setEditingCita(null);
+        setSelectedLeadId('');
+        setFechaCita('');
+        setHoraCita('');
+        setNotasCita('');
+        setIsCitaModalOpen(false);
+        fetchCitas();
+      } else {
+        alert('Error al actualizar cita: ' + error.message);
+      }
+    } else {
+      const { error } = await supabase.from('appointments').insert([{
+        lead_id: targetLeadId,
+        appointment_date: fechaCita,
+        appointment_time: horaCita,
+        notes: notasCita || null,
+        empresa_id: empresaId
+      }]);
+      setSavingCita(false);
+      if (!error) {
+        setSelectedLeadId('');
+        setFechaCita('');
+        setHoraCita('');
+        setNotasCita('');
+        setIsCitaModalOpen(false);
+        fetchCitas();
+      } else {
+        alert('Error al agendar cita: ' + error.message);
+      }
+    }
+  };
+
+  const handleDeleteCita = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar esta cita?')) return;
+    const { error } = await supabase.from('appointments').delete().eq('id', id);
+    if (!error) fetchCitas();
+    else alert('Error al eliminar cita: ' + error.message);
+  };
+
+  const handleCreateOrUpdateSocio = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetLeadId = selectedSocioLeadId || editingSocio?.lead_id;
+    if (!targetLeadId) {
+      alert('Por favor selecciona un lead para asociar como socio');
+      return;
+    }
+    setSavingSocio(true);
+    const empresaId = userProfile?.empresa_id || null;
+    if (editingSocio) {
+      const { error } = await supabase.from('socios').update({
+        lead_id: targetLeadId,
+        membership_id: selectedMembresiaId || null,
+        payment_status: paymentStatus,
+        notes: notasSocio || null
+      }).eq('id', editingSocio.id);
+      setSavingSocio(false);
+      if (!error) {
+        setEditingSocio(null);
+        setSelectedSocioLeadId('');
+        setSelectedMembresiaId('');
+        setPaymentStatus('Pagado');
+        setNotasSocio('');
+        setIsSocioModalOpen(false);
+        fetchSocios();
+      } else {
+        alert('Error al actualizar socio: ' + error.message);
+      }
+    } else {
+      const { error } = await supabase.from('socios').insert([{
+        lead_id: targetLeadId,
+        membership_id: selectedMembresiaId || null,
+        payment_status: paymentStatus,
+        notes: notasSocio || null,
+        empresa_id: empresaId
+      }]);
+      setSavingSocio(false);
+      if (!error) {
+        setSelectedSocioLeadId('');
+        setSelectedMembresiaId('');
+        setPaymentStatus('Pagado');
+        setNotasSocio('');
+        setIsSocioModalOpen(false);
+        fetchSocios();
+      } else {
+        alert('Error al registrar socio: ' + error.message);
+      }
+    }
+  };
+
+  const handleDeleteSocio = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este socio?')) return;
+    const { error } = await supabase.from('socios').delete().eq('id', id);
+    if (!error) fetchSocios();
+    else alert('Error al eliminar socio: ' + error.message);
+  };
+
+  const handleCreateOrUpdateMembresia = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingMembresia(true);
+    const empresaId = userProfile?.empresa_id || null;
+    if (editingMembresia) {
+      const { error } = await supabase.from('membresias').update({
+        nombre: nombreMembresia,
+        secciones: seccionesMembresia,
+        precio: parseFloat(precioMembresia) || 0
+      }).eq('id', editingMembresia.id);
+      setSavingMembresia(false);
+      if (!error) {
+        setEditingMembresia(null);
+        setNombreMembresia('');
+        setSeccionesMembresia('');
+        setPrecioMembresia('');
+        setIsMembresiaModalOpen(false);
+        fetchMembresias();
+      } else {
+        alert('Error al actualizar membresía: ' + error.message);
+      }
+    } else {
+      const { error } = await supabase.from('membresias').insert([{
+        nombre: nombreMembresia,
+        secciones: seccionesMembresia,
+        precio: parseFloat(precioMembresia) || 0,
+        empresa_id: empresaId
+      }]);
+      setSavingMembresia(false);
+      if (!error) {
+        setNombreMembresia('');
+        setSeccionesMembresia('');
+        setPrecioMembresia('');
+        setIsMembresiaModalOpen(false);
+        fetchMembresias();
+      } else {
+        alert('Error al crear membresía: ' + error.message);
+      }
+    }
+  };
+
+  const handleDeleteMembresia = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar esta membresía?')) return;
+    const { error } = await supabase.from('membresias').delete().eq('id', id);
+    if (!error) fetchMembresias();
+    else alert('Error al eliminar membresía: ' + error.message);
+  };
+
+  const handleCreateTeamMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingUser(true);
+    const empresaId = userProfile?.empresa_id || null;
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: nuevoEmail,
+      password: nuevoPassword,
+      options: {
+        data: {
+          full_name: nuevoNombre,
+          role: nuevoRol,
+          empresa_id: empresaId
+        }
+      }
+    });
+    setSavingUser(false);
+    if (!signUpError) {
+      alert('¡Usuario de equipo creado con éxito!');
+      setNuevoNombre('');
+      setNuevoEmail('');
+      setNuevoPassword('');
+      setNuevoRol('vendedor');
+      setIsUserModalOpen(false);
+      fetchTeam();
+    } else {
+      alert('Error al crear usuario: ' + signUpError.message);
+    }
+  };
+
+  const handleDeleteTeamMember = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este usuario del equipo?')) return;
+    const { error } = await supabase.from('profiles').delete().eq('id', id);
+    if (!error) fetchTeam();
+    else alert('Error al eliminar usuario: ' + error.message);
+  };
+
+  const handleSaveNotes = async () => {
+    if (!currentNoteTarget) return;
+    setSavingNote(true);
+    let tableName = 'leads';
+    if (currentNoteTarget.type === 'cita') tableName = 'appointments';
+    if (currentNoteTarget.type === 'socio') tableName = 'socios';
+
+    const { error } = await supabase.from(tableName).update({ notes: currentNoteTarget.notes }).eq('id', currentNoteTarget.id);
+    setSavingNote(false);
+    if (!error) {
+      setCurrentNoteTarget(null);
+      if (currentNoteTarget.type === 'lead') fetchDirige();
+      if (currentNoteTarget.type === 'cita') fetchCitas();
+      if (currentNoteTarget.type === 'socio') fetchSocios();
+    } else {
+      alert('Error al guardar notas: ' + error.message);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-950 text-white">
+        <p className="text-lg animate-pulse">Cargando sistema...</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-950 px-4">
+        <div className="w-full max-w-md space-y-8 rounded-xl bg-gray-900 p-8 border border-gray-800 shadow-2xl">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-white">AUTOMÁTIZALO CRM</h2>
+            <p className="mt-2 text-sm text-gray-400">Inicia sesión para acceder a tu panel</p>
+          </div>
+          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+            {loginError && (
+              <div className="rounded-md bg-red-900/50 p-4 text-sm text-red-200 border border-red-800">
+                {loginError}
+              </div>
+            )}
+            <div className="space-y-4 rounded-md shadow-sm">
+              <div>
+                <label className="sr-only">Correo electrónico</label>
+                <input
+                  type="email"
+                  required
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="relative block w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-white placeholder-gray-400 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                  placeholder="Correo electrónico"
+                />
+              </div>
+              <div>
+                <label className="sr-only">Contraseña</label>
+                <input
+                  type="password"
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="relative block w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-white placeholder-gray-400 focus:z-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                  placeholder="Contraseña"
+                />
+              </div>
+            </div>
+            <div>
+              <button
+                type="submit"
+                className="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Ingresar al Sistema
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen bg-gray-950 text-gray-100">
+      {/* Sidebar de Navegación */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 transform transition-transform duration-200 ease-in-out md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex h-16 items-center justify-between px-6 border-b border-gray-800">
+          <div className="flex items-center space-x-3">
+            {empresaActualLogo || globalLogo ? (
+              <img src={globalLogo || empresaActualLogo} alt="Logo" className="h-8 w-8 object-contain rounded" />
+            ) : (
+              <div className="h-8 w-8 bg-blue-600 rounded flex items-center justify-center font-bold">CRM</div>
+            )}
+            <span className="font-bold tracking-wider text-white">AUTOMÁTIZALO</span>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white">✕</button>
+        </div>
+
+        <nav className="p-4 space-y-1">
+          <button onClick={() => setCurrentTab('dirige')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'dirige' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+            Leads / Prospección
+          </button>
+          <button onClick={() => setCurrentTab('citas')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'citas' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+            Agenda de Citas
+          </button>
+          <button onClick={() => setCurrentTab('socios')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'socios' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+            Gestión de Socios
+          </button>
+          <button onClick={() => setCurrentTab('membresias')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'membresias' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+            Membresías / Planes
+          </button>
+          <button onClick={() => setCurrentTab('equipo')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'equipo' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+            Equipo y Accesos
+          </button>
+          <button onClick={() => setCurrentTab('metricas')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'metricas' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+            Métricas y Reportes
+          </button>
+          <button onClick={() => setCurrentTab('mensajes')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'mensajes' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+            Automatización WhatsApp
+          </button>
+
+          {userProfile?.role === 'superadmin' && (
+            <div className="pt-4 mt-4 border-t border-gray-800 space-y-1">
+              <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Panel Supremo</p>
+              <button onClick={() => setCurrentTab('superadmin')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'superadmin' ? 'bg-purple-600 text-white' : 'text-purple-400 hover:bg-gray-800 hover:text-white'}`}>
+                Gestión de Negocios
+              </button>
+              <button onClick={() => setCurrentTab('superadminLeads')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'superadminLeads' ? 'bg-purple-600 text-white' : 'text-purple-400 hover:bg-gray-800 hover:text-white'}`}>
+                Todos los Leads (Global)
+              </button>
+              <button onClick={() => setCurrentTab('configGlobal')} className={`w-full flex items-center px-4 py-2.5 rounded-lg text-sm font-medium ${currentTab === 'configGlobal' ? 'bg-purple-600 text-white' : 'text-purple-400 hover:bg-gray-800 hover:text-white'}`}>
+                Configuración Global
+              </button>
+            </div>
+          )}
+        </nav>
+
+        <div className="absolute bottom-0 w-full p-4 border-t border-gray-800 bg-gray-900">
+          <div className="flex items-center justify-between mb-3">
+            <div className="truncate">
+              <p className="text-sm font-medium text-white truncate">{userProfile?.full_name || session.user.email}</p>
+              <p className="text-xs text-gray-400 uppercase">{userProfile?.role || 'Usuario'}</p>
+            </div>
+          </div>
+          <button onClick={handleLogout} className="w-full flex items-center justify-center px-4 py-2 border border-gray-700 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/30 transition-colors">
+            Cerrar Sesión
+          </button>
+        </div>
+      </aside>
+
+      {/* Contenido Principal */}
+      <main className="flex-1 md:pl-64 flex flex-col min-h-screen">
+        <header className="h-16 border-b border-gray-800 bg-gray-900/50 backdrop-blur flex items-center justify-between px-6 sticky top-0 z-40">
+          <button onClick={() => setIsSidebarOpen(true)} className="md:hidden text-gray-400 hover:text-white">☰ Menú</button>
+          <div className="flex items-center space-x-4 ml-auto">
+            <span className="text-sm text-gray-400">Sucursal Activa</span>
+          </div>
+        </header>
+
+        <div className="p-6 flex-1">
+          {currentTab === 'dirige' && (
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold">Gestión de Leads ({dirige.length})</h1>
+                <button onClick={() => { setEditingLead(null); setNombre(''); setTelefono(''); setCorreo(''); setNotasLead(''); setIsLeadModalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium">
+                  + Nuevo Lead
+                </button>
+              </div>
+
+              {/* Vista de Leads */}
+              {loadingLeads ? (
+                <p className="text-gray-400">Cargando leads...</p>
+              ) : dirige.length === 0 ? (
+                <p className="text-gray-400">No hay leads registrados.</p>
+              ) : (
+                <div className="space-y-4">
+                  {dirige.map((lead) => (
+                    <div key={lead.id} className="bg-gray-900 border border-gray-800 p-4 rounded-xl flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-white text-lg">{lead.full_name || lead.name}</h3>
+                        <p className="text-sm text-gray-400">{lead.phone} • {lead.email || 'Sin correo'}</p>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <select
+                          value={lead.status}
+                          onChange={(e) => handleUpdateLeadStatusInline(lead.id, e.target.value)}
+                          className="bg-gray-800 border border-gray-700 text-xs rounded px-2 py-1 text-white"
+                        >
+                          {statuses.map(st => <option key={st} value={st}>{st}</option>)}
+                        </select>
+                        <button onClick={() => handleDeleteLead(lead.id)} className="bg-red-600/20 text-red-400 px-3 py-1 rounded text-xs hover:bg-red-600/40">Eliminar</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentTab === 'superadmin' && userProfile?.role === 'superadmin' && (
+            <div>
+              <h1 className="text-2xl font-bold mb-6">Gestión de Negocios y Sucursales</h1>
+              <form onSubmit={handleCreateEmpresaMaster} className="bg-gray-900 border border-gray-800 p-6 rounded-xl mb-8 space-y-4">
+                <h3 className="text-lg font-semibold text-white">Registrar Nueva Sucursal / Negocio</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input type="text" placeholder="Nombre del Negocio" value={nuevaEmpresaNombre} onChange={(e) => setNuevaEmpresaNombre(e.target.value)} required className="bg-gray-800 border border-gray-700 rounded p-2 text-white" />
+                  <input type="text" placeholder="Teléfono" value={nuevoTelefono} onChange={(e) => setNuevoTelefono(e.target.value)} className="bg-gray-800 border border-gray-700 rounded p-2 text-white" />
+                  <input type="text" placeholder="Dirección" value={nuevaDireccion} onChange={(e) => setNuevaDireccion(e.target.value)} className="bg-gray-800 border border-gray-700 rounded p-2 text-white" />
+                  <input type="email" placeholder="Correo del Administrador" value={adminEmpresaEmail} onChange={(e) => setAdminEmpresaEmail(e.target.value)} required className="bg-gray-800 border border-gray-700 rounded p-2 text-white" />
+                  <input type="password" placeholder="Contraseña del Administrador" value={adminEmpresaPass} onChange={(e) => setAdminEmpresaPass(e.target.value)} required className="bg-gray-800 border border-gray-700 rounded p-2 text-white" />
+                  <input type="text" placeholder="Nombre del Administrador" value={adminEmpresaNombre} onChange={(e) => setAdminEmpresaNombre(e.target.value)} required className="bg-gray-800 border border-gray-700 rounded p-2 text-white" />
+                </div>
+                <button type="submit" disabled={savingEmpresa} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-medium">
+                  {savingEmpresa ? 'Creando...' : 'Crear Negocio y Admin'}
+                </button>
+              </form>
+
+              <h3 className="text-lg font-semibold mb-4">Negocios Registrados</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {empresas.map((emp) => (
+                  <div key={emp.id} className="bg-gray-900 border border-gray-800 p-4 rounded-xl flex justify-between items-center">
+                    <div>
+                      <h4 className="font-bold text-white">{emp.nombre}</h4>
+                      <p className="text-sm text-gray-400">{emp.direccion || 'Sin dirección'} • {emp.telefono || 'Sin teléfono'}</p>
+                      <p className="text-xs text-purple-400 mt-1">ID: {emp.id}</p>
+                    </div>
+                    <button onClick={() => handleDeleteEmpresa(emp.id)} className="bg-red-600/20 text-red-400 px-3 py-1 rounded text-xs hover:bg-red-600/40">Eliminar</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {currentTab === 'superadminLeads' && userProfile?.role === 'superadmin' && (
+            <div>
+              <h1 className="text-2xl font-bold mb-6">Vista Global de Leads ({allLeadsSuperadmin.length})</h1>
+              <div className="space-y-4">
+                {allLeadsSuperadmin.map((lead) => (
+                  <div key={lead.id} className="bg-gray-900 border border-gray-800 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-white text-lg">{lead.full_name || lead.name}</h3>
+                      <p className="text-sm text-gray-400">{lead.phone} • {lead.email || 'Sin correo'}</p>
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-purple-900/40 text-purple-300 text-xs rounded border border-purple-800">
+                        Sucursal: {lead.empresas?.nombre || 'General / Desconocida'}
+                      </span>
+                    </div>
+                    <span className="text-xs bg-gray-800 px-3 py-1 rounded text-gray-300">{lead.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {currentTab === 'configGlobal' && userProfile?.role === 'superadmin' && (
+            <div>
+              <h1 className="text-2xl font-bold mb-6">Configuración Global de la Aplicación</h1>
+              <div className="bg-gray-900 border border-gray-800 p-6 rounded-xl max-w-xl space-y-4">
+                <h3 className="text-lg font-semibold text-white">Logo Global del Sistema</h3>
+                <p className="text-sm text-gray-400">Sube un logo que se aplicará automáticamente a todas las sucursales y paneles de la plataforma.</p>
+                <input type="file" accept="image/*" onChange={handleGlobalLogoUpdate} className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700" />
+                {globalLogo && <div className="mt-4"><img src={globalLogo} alt="Vista previa" className="h-16 w-16 object-contain rounded border border-gray-700" /></div>}
+              </div>
+            </div>
+          )}
+
+          {/* Demás pestañas predeterminadas */}
+          {['citas', 'socios', 'membresias', 'equipo', 'metricas', 'mensajes'].includes(currentTab) && currentTab !== 'superadmin' && currentTab !== 'superadminLeads' && currentTab !== 'configGlobal' && currentTab !== 'dirige' && (
+            <div>
+              <h1 className="text-2xl font-bold capitalize mb-4">{currentTab}</h1>
+              <p className="text-gray-400">Módulo activo para la sucursal seleccionada.</p>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Modal para Crear/Editar Lead */}
+      {isLeadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-white">{editingLead ? 'Editar Lead' : 'Nuevo Lead'}</h3>
+            <form onSubmit={handleCreateOrUpdateLead} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">Nombre Completo</label>
+                <input type="text" required value={nombre} onChange={(e) => setNombre(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">Teléfono</label>
+                <input type="text" required value={telefono} onChange={(e) => setTelefono(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">Correo Electrónico</label>
+                <input type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">Origen</label>
+                <select value={origen} onChange={(e) => setOrigen(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-sm">
+                  <option value="Facebook Ads">Facebook Ads</option>
+                  <option value="WhatsApp">WhatsApp</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="Sitio Web">Sitio Web</option>
+                </select>
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button type="button" onClick={() => setIsLeadModalOpen(false)} className="px-4 py-2 rounded bg-gray-800 text-gray-300 text-sm hover:bg-gray-700">Cancelar</button>
+                <button type="submit" disabled={savingLead} className="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">{savingLead ? 'Guardando...' : 'Guardar Lead'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}    }
     setSavingCita(true);
     const empresaId = userProfile?.empresa_id || null;
     
